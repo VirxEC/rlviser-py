@@ -73,7 +73,7 @@ pub const OCTANE: CarConfig = CarConfig {
 
 /// Reads the RLGym state and sends it to RLViser to render
 #[pyfunction]
-fn render_rlgym(gym_state: GymState) -> PyResult<()> {
+fn render_rlgym(gym_state: GymState) {
     // construct the game state
     let game_state = GameState {
         tick_count: TICK_COUNT.fetch_add(1, Ordering::SeqCst),
@@ -125,8 +125,6 @@ fn render_rlgym(gym_state: GymState) -> PyResult<()> {
     };
 
     socket::send_game_state(&game_state).unwrap();
-
-    Ok(())
 }
 
 /// Send the quit signal to RLViser

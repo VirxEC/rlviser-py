@@ -1,12 +1,17 @@
 [package]
 name = "rlviser-py"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
+description = "Python implementation that manages a UDP connection to RLViser"
+license = "MIT"
+repository = "https://github.com/VirxEC/rlviser-py"
+readme = "README.md"
+keywords = ["rlviser", "rocket-league", "udp", "python", "rlbot"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "rlviser_py"
-crate-type = ["rlib", "cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 glam = "0.24.0"
@@ -16,5 +21,6 @@ pyo3 = "0.19.0"
 [profile.release]
 lto = true
 strip = true
+opt-level = "z"
 codegen-units = 1
 panic = "abort"
