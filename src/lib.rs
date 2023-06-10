@@ -7,13 +7,16 @@ use crate::{
     gym::GymState,
 };
 use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, WheelPairConfig};
-use glam::{Mat3A, Quat, Vec3A, EulerRot};
+use glam::{EulerRot, Mat3A, Quat, Vec3A, Vec3};
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
-use std::{sync::{
-    atomic::{AtomicU64, Ordering},
-    RwLock,
-}, f32::consts::PI};
+use std::{
+    f32::consts::PI,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        RwLock,
+    },
+};
 
 macro_rules! pynamedmodule {
     (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*], classes: [$($class_name:ident),*]) => {
@@ -83,7 +86,12 @@ fn render_rlgym(gym_state: GymState) {
             vel: gym_state.ball.linear_velocity.into(),
             ang_vel: gym_state.ball.angular_velocity.into(),
         },
-        ball_rot: Quat::from_array(gym_state.ball.quaternion),
+        ball_rot: {
+            // let (yaw, pitch, roll) = Quat::from_array(gym_state.ball.quaternion)
+            //     .to_euler(EulerRot::ZYX);
+            // Quat::from_euler(EulerRot::XYZ, yaw, pitch, roll + PI)
+            Quat::from_array(gym_state.ball.quaternion) * Quat::from_axis_angle(Vec3::Y, PI) // * Quat::from_axis_angle(Vec3::Z, PI)
+        },
         pads: BOOST_PAD_LOCATIONS
             .read()
             .unwrap()
@@ -104,17 +112,15 @@ fn render_rlgym(gym_state: GymState) {
             .enumerate()
             .map(|(id, player)| CarInfo {
                 id: id as u32 + 1,
-                team: if player.team_num < 0.5 {
-                    Team::Blue
-                } else {
-                    Team::Orange
-                },
+                team: if player.team_num < 0.5 { Team::Blue } else { Team::Orange },
                 state: CarState {
                     pos: player.car_data.position.into(),
                     vel: player.car_data.linear_velocity.into(),
                     ang_vel: player.car_data.angular_velocity.into(),
                     rot_mat: {
-                        let (yaw, pitch, roll) = Quat::from_array(player.car_data.quaternion).conjugate().to_euler(EulerRot::ZYX);
+                        let (yaw, pitch, roll) = Quat::from_array(player.car_data.quaternion)
+                            .conjugate()
+                            .to_euler(EulerRot::ZYX);
                         Mat3A::from_euler(EulerRot::XYZ, yaw, pitch, roll + PI)
                     },
                     ..Default::default()
