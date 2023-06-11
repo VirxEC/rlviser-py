@@ -7,15 +7,12 @@ use crate::{
     gym::GymState,
 };
 use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, WheelPairConfig};
-use glam::{EulerRot, Mat3A, Quat, Vec3A, Vec3};
+use glam::{Mat3A, Quat, Vec3A};
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
-use std::{
-    f32::consts::PI,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        RwLock,
-    },
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    RwLock,
 };
 
 macro_rules! pynamedmodule {
@@ -74,6 +71,16 @@ pub const OCTANE: CarConfig = CarConfig {
     dodge_deadzone: 0.5,
 };
 
+#[inline]
+fn ball_to_quat(array: [f32; 4]) -> Quat {
+    Quat::from_xyzw(array[1], array[2], array[3], array[0])
+}
+
+#[inline]
+fn car_to_mat3a(array: [f32; 4]) -> Mat3A {
+    Mat3A::from_quat(Quat::from_xyzw(-array[1], array[2], array[3], array[0]))
+}
+
 /// Reads the RLGym state and sends it to RLViser to render
 #[pyfunction]
 fn render_rlgym(gym_state: GymState) {
@@ -86,12 +93,7 @@ fn render_rlgym(gym_state: GymState) {
             vel: gym_state.ball.linear_velocity.into(),
             ang_vel: gym_state.ball.angular_velocity.into(),
         },
-        ball_rot: {
-            // let (yaw, pitch, roll) = Quat::from_array(gym_state.ball.quaternion)
-            //     .to_euler(EulerRot::ZYX);
-            // Quat::from_euler(EulerRot::XYZ, yaw, pitch, roll + PI)
-            Quat::from_array(gym_state.ball.quaternion) * Quat::from_axis_angle(Vec3::Y, PI) // * Quat::from_axis_angle(Vec3::Z, PI)
-        },
+        ball_rot: ball_to_quat(gym_state.ball.quaternion),
         pads: BOOST_PAD_LOCATIONS
             .read()
             .unwrap()
@@ -117,12 +119,8 @@ fn render_rlgym(gym_state: GymState) {
                     pos: player.car_data.position.into(),
                     vel: player.car_data.linear_velocity.into(),
                     ang_vel: player.car_data.angular_velocity.into(),
-                    rot_mat: {
-                        let (yaw, pitch, roll) = Quat::from_array(player.car_data.quaternion)
-                            .conjugate()
-                            .to_euler(EulerRot::ZYX);
-                        Mat3A::from_euler(EulerRot::XYZ, yaw, pitch, roll + PI)
-                    },
+                    rot_mat: car_to_mat3a(player.car_data.quaternion),
+                    is_on_ground: player.on_ground != 0,
                     ..Default::default()
                 },
                 config: OCTANE,
