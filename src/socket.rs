@@ -19,12 +19,14 @@ static SOCKET: RwLock<Lazy<(UdpSocket, SocketAddr)>> = RwLock::new(Lazy::new(|| 
 
 pub fn init() -> io::Result<(UdpSocket, SocketAddr)> {
     // launch RLViser
-    Command::new(RLVISER_PATH).spawn()?;
+    if let Err(e) = Command::new(RLVISER_PATH).spawn() {
+        println!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
+    }
 
     // Connect to RLViser
     let socket = UdpSocket::bind("0.0.0.0:34254")?;
 
-    println!("Waiting for RLViser to connect...");
+    println!("Waiting for connection to socket...");
     let mut buf = [0; 1];
     let (_, src) = socket.recv_from(&mut buf)?;
 
