@@ -72,13 +72,8 @@ pub const OCTANE: CarConfig = CarConfig {
 };
 
 #[inline]
-fn ball_to_quat(array: [f32; 4]) -> Quat {
-    Quat::from_xyzw(array[1], array[2], array[3], array[0])
-}
-
-#[inline]
-fn car_to_mat3a(array: [f32; 4]) -> Mat3A {
-    Mat3A::from_quat(Quat::from_xyzw(-array[1], array[2], array[3], array[0]))
+fn array_to_quat(array: [f32; 4]) -> Quat {
+    Quat::from_xyzw(-array[1], -array[2], array[3], array[0])
 }
 
 /// Reads the RLGym state and sends it to RLViser to render
@@ -93,7 +88,7 @@ fn render_rlgym(gym_state: GymState) {
             vel: gym_state.ball.linear_velocity.into(),
             ang_vel: gym_state.ball.angular_velocity.into(),
         },
-        ball_rot: ball_to_quat(gym_state.ball.quaternion),
+        ball_rot: array_to_quat(gym_state.ball.quaternion),
         pads: BOOST_PAD_LOCATIONS
             .read()
             .unwrap()
@@ -119,8 +114,11 @@ fn render_rlgym(gym_state: GymState) {
                     pos: player.car_data.position.into(),
                     vel: player.car_data.linear_velocity.into(),
                     ang_vel: player.car_data.angular_velocity.into(),
-                    rot_mat: car_to_mat3a(player.car_data.quaternion),
+                    rot_mat: Mat3A::from_quat(array_to_quat(player.car_data.quaternion)),
                     is_on_ground: player.on_ground != 0,
+                    is_demoed: player.is_demoed != 0,
+                    has_flipped: player.has_flip == 0,
+                    has_jumped: player.has_jump == 0,
                     ..Default::default()
                 },
                 config: OCTANE,
