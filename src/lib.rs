@@ -1,13 +1,14 @@
 mod bytes;
 mod gym;
+mod rocketsim;
 mod socket;
 
 use crate::{
     bytes::{BoostPad, BoostPadState},
     gym::GymState,
 };
-use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, WheelPairConfig};
-use glam::{Mat3A, Quat, Vec3A};
+use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, Vec3, WheelPairConfig};
+use glam::{Mat3A, Quat};
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
 use std::sync::{
@@ -34,6 +35,7 @@ pynamedmodule! {
     funcs: [
         set_boost_pad_locations,
         render_rlgym,
+        render,
         quit
     ],
     classes: []
@@ -42,7 +44,7 @@ pynamedmodule! {
 const TICK_RATE: f32 = 1. / 120.;
 
 static TICK_COUNT: AtomicU64 = AtomicU64::new(0);
-static BOOST_PAD_LOCATIONS: RwLock<[Vec3A; BOOST_PADS_LENGTH]> = RwLock::new([Vec3A::ZERO; BOOST_PADS_LENGTH]);
+static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
 
 /// Set the boost pad locations to send to RLViser in each packet
 #[pyfunction]
@@ -51,22 +53,22 @@ fn set_boost_pad_locations(locations: [[f32; 3]; BOOST_PADS_LENGTH]) {
         .write()
         .unwrap()
         .iter_mut()
-        .zip(locations.into_iter())
-        .for_each(|(rloc, pyloc)| *rloc = Vec3A::from_array(pyloc));
+        .zip(locations)
+        .for_each(|(rloc, pyloc)| *rloc = Vec3::from_array(pyloc));
 }
 
 pub const OCTANE: CarConfig = CarConfig {
-    hitbox_size: Vec3A::new(120.507, 86.6994, 38.6591),
-    hitbox_pos_offset: Vec3A::new(13.87566, 0., 20.755),
+    hitbox_size: Vec3::new(120.507, 86.6994, 38.6591),
+    hitbox_pos_offset: Vec3::new(13.87566, 0., 20.755),
     front_wheels: WheelPairConfig {
         wheel_radius: 12.5,
         suspension_rest_length: 38.755,
-        connection_point_offset: Vec3A::new(51.25, 25.9, 20.755),
+        connection_point_offset: Vec3::new(51.25, 25.9, 20.755),
     },
     back_wheels: WheelPairConfig {
         wheel_radius: 15.,
         suspension_rest_length: 37.055,
-        connection_point_offset: Vec3A::new(-33.75, 29.5, 20.755),
+        connection_point_offset: Vec3::new(-33.75, 29.5, 20.755),
     },
     dodge_deadzone: 0.5,
 };
@@ -93,7 +95,7 @@ fn render_rlgym(gym_state: GymState) {
             .read()
             .unwrap()
             .into_iter()
-            .zip(gym_state.boost_pads.into_iter())
+            .zip(gym_state.boost_pads)
             .map(|(position, is_active)| BoostPad {
                 position,
                 is_big: position.z == 73.,
@@ -114,7 +116,7 @@ fn render_rlgym(gym_state: GymState) {
                     pos: player.car_data.position.into(),
                     vel: player.car_data.linear_velocity.into(),
                     ang_vel: player.car_data.angular_velocity.into(),
-                    rot_mat: Mat3A::from_quat(array_to_quat(player.car_data.quaternion)),
+                    rot_mat: Mat3A::from_quat(array_to_quat(player.car_data.quaternion)).into(),
                     is_on_ground: player.on_ground != 0,
                     is_demoed: player.is_demoed != 0,
                     has_flipped: player.has_flip == 0,
@@ -126,6 +128,47 @@ fn render_rlgym(gym_state: GymState) {
             .collect(),
     };
 
+    socket::send_game_state(&game_state).unwrap();
+}
+
+#[pyfunction]
+fn render(
+    tick_count: u64,
+    tick_rate: f32,
+    boost_pad_states: [bool; BOOST_PADS_LENGTH],
+    ball: BallState,
+    cars: Vec<(u32, u8, CarConfig, rocketsim::CarState)>,
+) {
+    let game_state = GameState {
+        tick_count,
+        tick_rate,
+        ball,
+        // no way of getting rotation right now
+        ball_rot: Quat::IDENTITY,
+        pads: BOOST_PAD_LOCATIONS
+            .read()
+            .unwrap()
+            .into_iter()
+            .zip(boost_pad_states)
+            .map(|(position, is_active)| BoostPad {
+                position,
+                is_big: position.z == 73.,
+                state: BoostPadState {
+                    is_active,
+                    ..Default::default()
+                },
+            })
+            .collect(),
+        cars: cars
+            .into_iter()
+            .map(|(id, team, config, state)| CarInfo {
+                id,
+                team: Team::from_u8(team),
+                config,
+                state: state.into(),
+            })
+            .collect(),
+    };
     socket::send_game_state(&game_state).unwrap();
 }
 

@@ -1,6 +1,83 @@
-use glam::{Mat3A as RotMat, Quat, Vec3A as Vec3};
+use core::panic;
 
-#[derive(Clone, Copy, Default, Debug)]
+use glam::{Mat3A, Quat, Vec3A};
+use pyo3::FromPyObject;
+
+#[derive(Clone, Copy, Debug, Default, FromPyObject)]
+pub struct Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+impl Vec3 {
+    pub const ZERO: Self = Self::new(0., 0., 0.);
+    pub const X: Self = Self::new(1., 0., 0.);
+    pub const Y: Self = Self::new(0., 1., 0.);
+    pub const Z: Self = Self::new(0., 0., 1.);
+
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    pub const fn from_array(array: [f32; 3]) -> Self {
+        Self::new(array[0], array[1], array[2])
+    }
+}
+
+impl From<[f32; 3]> for Vec3 {
+    #[inline]
+    fn from(value: [f32; 3]) -> Self {
+        Self::from_array(value)
+    }
+}
+
+impl From<Vec3A> for Vec3 {
+    #[inline]
+    fn from(value: Vec3A) -> Self {
+        Self::new(value.x, value.y, value.z)
+    }
+}
+
+#[derive(Clone, Copy, Debug, FromPyObject)]
+pub struct RotMat {
+    pub forward: Vec3,
+    pub right: Vec3,
+    pub up: Vec3,
+}
+
+impl Default for RotMat {
+    #[inline]
+    fn default() -> Self {
+        Self::IDENTITY
+    }
+}
+
+impl RotMat {
+    pub const IDENTITY: Self = Self::new(Vec3::X, Vec3::Y, Vec3::Z);
+
+    #[inline]
+    pub const fn new(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Self {
+        Self {
+            forward: x_axis,
+            right: y_axis,
+            up: z_axis,
+        }
+    }
+}
+
+impl From<Mat3A> for RotMat {
+    #[inline]
+    fn from(value: Mat3A) -> Self {
+        Self {
+            forward: value.x_axis.into(),
+            right: value.y_axis.into(),
+            up: value.z_axis.into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, FromPyObject)]
 pub struct BallHitInfo {
     pub is_valid: bool,
     pub relative_pos_on_ball: Vec3,
@@ -10,7 +87,7 @@ pub struct BallHitInfo {
     pub tick_count_when_extra_impulse_applied: u64,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, FromPyObject)]
 pub struct BallState {
     pub pos: Vec3,
     pub vel: Vec3,
@@ -36,14 +113,25 @@ pub enum Team {
     Orange,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+impl Team {
+    #[inline]
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => Self::Blue,
+            1 => Self::Orange,
+            _ => panic!("Invalid team value: {}", value),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug, FromPyObject)]
 pub struct WheelPairConfig {
     pub wheel_radius: f32,
     pub suspension_rest_length: f32,
     pub connection_point_offset: Vec3,
 }
 
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default, Debug, FromPyObject)]
 pub struct CarConfig {
     pub hitbox_size: Vec3,
     pub hitbox_pos_offset: Vec3,
@@ -52,7 +140,7 @@ pub struct CarConfig {
     pub dodge_deadzone: f32,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, FromPyObject)]
 pub struct CarControls {
     pub throttle: f32,
     pub steer: f32,
@@ -64,7 +152,7 @@ pub struct CarControls {
     pub handbrake: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, FromPyObject)]
 pub struct CarState {
     pub pos: Vec3,
     pub rot_mat: RotMat,
@@ -77,6 +165,7 @@ pub struct CarState {
     pub last_rel_dodge_torque: Vec3,
     pub jump_time: f32,
     pub flip_time: f32,
+
     pub is_flipping: bool,
     pub is_jumping: bool,
     pub air_time_since_jump: f32,
@@ -88,10 +177,10 @@ pub struct CarState {
     pub is_auto_flipping: bool,
     pub auto_flip_timer: f32,
     pub auto_flip_torque_scale: f32,
-    pub has_contact: bool,
+    pub has_world_contact: bool,
     pub contact_normal: Vec3,
-    pub other_car_id: u32,
-    pub cooldown_timer: f32,
+    pub car_contact_id: u32,
+    pub car_contact_cooldown_timer: f32,
     pub is_demoed: bool,
     pub demo_respawn_timer: f32,
     pub ball_hit_info: BallHitInfo,
@@ -152,9 +241,9 @@ impl ToBytesExact<{ Self::NUM_BYTES }> for Vec3 {
 impl ToBytesExact<{ Self::NUM_BYTES }> for RotMat {
     fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
         let mut bytes = [0; Self::NUM_BYTES];
-        bytes[..Vec3::NUM_BYTES].copy_from_slice(&self.x_axis.to_bytes());
-        bytes[Vec3::NUM_BYTES..Vec3::NUM_BYTES * 2].copy_from_slice(&self.y_axis.to_bytes());
-        bytes[Vec3::NUM_BYTES * 2..].copy_from_slice(&self.z_axis.to_bytes());
+        bytes[..Vec3::NUM_BYTES].copy_from_slice(&self.forward.to_bytes());
+        bytes[Vec3::NUM_BYTES..Vec3::NUM_BYTES * 2].copy_from_slice(&self.right.to_bytes());
+        bytes[Vec3::NUM_BYTES * 2..].copy_from_slice(&self.up.to_bytes());
         bytes
     }
 }
@@ -305,7 +394,7 @@ impl ToBytesExact<{ Self::NUM_BYTES }> for CarState {
         // has_contact: bool,
         bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9
             ..Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9]
-            .copy_from_slice(&(self.has_contact as u8).to_le_bytes());
+            .copy_from_slice(&(self.has_world_contact as u8).to_le_bytes());
         // contact_normal: Vec3,
         bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9]
@@ -313,11 +402,11 @@ impl ToBytesExact<{ Self::NUM_BYTES }> for CarState {
         // other_car_id: u32,
         bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9 + u32::NUM_BYTES]
-            .copy_from_slice(&self.other_car_id.to_le_bytes());
+            .copy_from_slice(&self.car_contact_id.to_le_bytes());
         // cooldown_timer: f32,
         bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9 + u32::NUM_BYTES
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 10 + u32::NUM_BYTES]
-            .copy_from_slice(&self.cooldown_timer.to_le_bytes());
+            .copy_from_slice(&self.car_contact_cooldown_timer.to_le_bytes());
         // is_demoed: bool,
         bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 10 + u32::NUM_BYTES
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 10 + f32::NUM_BYTES * 10 + u32::NUM_BYTES]
@@ -446,9 +535,9 @@ impl FromBytesExact for RotMat {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         RotMat {
-            x_axis: Vec3::from_bytes(&bytes[..Vec3::NUM_BYTES]),
-            y_axis: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES..Vec3::NUM_BYTES * 2]),
-            z_axis: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES * 2..]),
+            forward: Vec3::from_bytes(&bytes[..Vec3::NUM_BYTES]),
+            right: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES..Vec3::NUM_BYTES * 2]),
+            up: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES * 2..]),
         }
     }
 }
@@ -605,16 +694,16 @@ impl FromBytesExact for CarState {
                 &bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 7
                     ..Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9],
             ),
-            has_contact: bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9] != 0,
+            has_world_contact: bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9] != 0,
             contact_normal: Vec3::from_bytes(
                 &bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 8
                     ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9],
             ),
-            other_car_id: u32::from_bytes(
+            car_contact_id: u32::from_bytes(
                 &bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 8
                     ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9 + u32::NUM_BYTES],
             ),
-            cooldown_timer: f32::from_bytes(
+            car_contact_cooldown_timer: f32::from_bytes(
                 &bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 8 + u32::NUM_BYTES
                     ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 10 + u32::NUM_BYTES],
             ),

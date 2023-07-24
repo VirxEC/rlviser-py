@@ -70,3 +70,13 @@ docs/_build/
 
 # Pyenv
 .python-version
+
+# RocketSim
+collision_meshes/
+
+# RLViser
+rlviser*
+umodel*
+assets.path
+assets/
+settings.txt
