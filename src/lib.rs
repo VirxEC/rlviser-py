@@ -1,6 +1,5 @@
 mod bytes;
 mod gym;
-mod rocketsim;
 mod socket;
 
 use crate::{
@@ -137,14 +136,14 @@ fn render(
     tick_rate: f32,
     boost_pad_states: [bool; BOOST_PADS_LENGTH],
     ball: BallState,
-    cars: Vec<(u32, u8, CarConfig, rocketsim::CarState)>,
+    ball_rot: [f32; 4],
+    cars: Vec<(u32, u8, CarConfig, CarState)>,
 ) {
     let game_state = GameState {
         tick_count,
         tick_rate,
         ball,
-        // no way of getting rotation right now
-        ball_rot: Quat::IDENTITY,
+        ball_rot: Quat::from_array(ball_rot),
         pads: BOOST_PAD_LOCATIONS
             .read()
             .unwrap()
@@ -165,7 +164,7 @@ fn render(
                 id,
                 team: Team::from_u8(team),
                 config,
-                state: state.into(),
+                state,
             })
             .collect(),
     };

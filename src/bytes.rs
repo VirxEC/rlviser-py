@@ -165,7 +165,6 @@ pub struct CarState {
     pub last_rel_dodge_torque: Vec3,
     pub jump_time: f32,
     pub flip_time: f32,
-
     pub is_flipping: bool,
     pub is_jumping: bool,
     pub air_time_since_jump: f32,
@@ -178,7 +177,7 @@ pub struct CarState {
     pub auto_flip_timer: f32,
     pub auto_flip_torque_scale: f32,
     pub has_world_contact: bool,
-    pub contact_normal: Vec3,
+    pub world_contact_normal: Vec3,
     pub car_contact_id: u32,
     pub car_contact_cooldown_timer: f32,
     pub is_demoed: bool,
@@ -398,7 +397,7 @@ impl ToBytesExact<{ Self::NUM_BYTES }> for CarState {
         // contact_normal: Vec3,
         bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9]
-            .copy_from_slice(&self.contact_normal.to_bytes());
+            .copy_from_slice(&self.world_contact_normal.to_bytes());
         // other_car_id: u32,
         bytes[Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9
             ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9 + u32::NUM_BYTES]
@@ -695,7 +694,7 @@ impl FromBytesExact for CarState {
                     ..Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9],
             ),
             has_world_contact: bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 8 + f32::NUM_BYTES * 9] != 0,
-            contact_normal: Vec3::from_bytes(
+            world_contact_normal: Vec3::from_bytes(
                 &bytes[Vec3::NUM_BYTES * 4 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 8
                     ..Vec3::NUM_BYTES * 5 + RotMat::NUM_BYTES + 9 + f32::NUM_BYTES * 9],
             ),
