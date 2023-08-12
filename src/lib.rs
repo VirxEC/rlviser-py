@@ -40,7 +40,7 @@ pynamedmodule! {
     classes: []
 }
 
-const TICK_RATE: f32 = 1. / 120.;
+const TICK_RATE: f32 = 120.;
 
 static TICK_COUNT: AtomicU64 = AtomicU64::new(0);
 static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
