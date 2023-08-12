@@ -7,7 +7,7 @@ use crate::{
     gym::GymState,
 };
 use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, Vec3, WheelPairConfig};
-use glam::{Mat3A, Quat};
+use glam::{Mat3, Quat};
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
 use std::sync::{
@@ -115,11 +115,12 @@ fn render_rlgym(gym_state: GymState) {
                     pos: player.car_data.position.into(),
                     vel: player.car_data.linear_velocity.into(),
                     ang_vel: player.car_data.angular_velocity.into(),
-                    rot_mat: Mat3A::from_quat(array_to_quat(player.car_data.quaternion)).into(),
+                    rot_mat: Mat3::from_quat(array_to_quat(player.car_data.quaternion)).into(),
                     is_on_ground: player.on_ground != 0,
                     is_demoed: player.is_demoed != 0,
                     has_flipped: player.has_flip == 0,
                     has_jumped: player.has_jump == 0,
+                    boost: player.boost_amount,
                     ..Default::default()
                 },
                 config: OCTANE,
