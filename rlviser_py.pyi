@@ -12,9 +12,9 @@ except ImportError:
     pass
 
 try:
-    from rlgym_sim.utils.gamestates.game_state import GameState
+    from rlgym.rocket_league.engine.game_state import GameState
 
-    def render_rlgym(gym_state: GameState) -> ...:
+    def render_rlgym(tick_count: int, tick_rate: float, gym_state: GameState) -> ...:
         pass
 except ImportError:
     pass

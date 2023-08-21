@@ -7,13 +7,10 @@ use crate::{
     gym::GymState,
 };
 use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, Vec3, WheelPairConfig};
-use glam::{Mat3, Quat};
+use glam::Quat;
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 macro_rules! pynamedmodule {
     (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*], classes: [$($class_name:ident),*]) => {
@@ -40,9 +37,6 @@ pynamedmodule! {
     classes: []
 }
 
-const TICK_RATE: f32 = 120.;
-
-static TICK_COUNT: AtomicU64 = AtomicU64::new(0);
 static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
 
 /// Set the boost pad locations to send to RLViser in each packet
@@ -72,55 +66,52 @@ pub const OCTANE: CarConfig = CarConfig {
     dodge_deadzone: 0.5,
 };
 
-#[inline]
-fn array_to_quat(array: [f32; 4]) -> Quat {
-    Quat::from_xyzw(-array[1], -array[2], array[3], array[0])
+fn get_sorted_ids<T>(cars: &HashMap<String, T>) -> Vec<&String> {
+    let mut ids = cars.keys().collect::<Vec<_>>();
+    ids.sort();
+    ids
 }
 
 /// Reads the RLGym state and sends it to RLViser to render
 #[pyfunction]
-fn render_rlgym(gym_state: GymState) {
+fn render_rlgym(tick_count: u64, tick_rate: f32, gym_state: GymState) {
     // construct the game state
     let game_state = GameState {
-        tick_count: TICK_COUNT.fetch_add(1, Ordering::SeqCst),
-        tick_rate: TICK_RATE,
+        tick_count,
+        tick_rate,
         ball: BallState {
             pos: gym_state.ball.position.into(),
             vel: gym_state.ball.linear_velocity.into(),
             ang_vel: gym_state.ball.angular_velocity.into(),
         },
-        ball_rot: array_to_quat(gym_state.ball.quaternion),
+        ball_rot: Quat::IDENTITY,
         pads: BOOST_PAD_LOCATIONS
             .read()
             .unwrap()
             .into_iter()
-            .zip(gym_state.boost_pads)
-            .map(|(position, is_active)| BoostPad {
+            .zip(gym_state.boost_pad_timers)
+            .map(|(position, time)| BoostPad {
                 position,
                 is_big: position.z == 73.,
                 state: BoostPadState {
-                    is_active: is_active > 0.5,
+                    is_active: time == 0.,
                     ..Default::default()
                 },
             })
             .collect(),
-        cars: gym_state
-            .players
+        cars: get_sorted_ids(&gym_state.cars)
             .into_iter()
-            .enumerate()
-            .map(|(id, player)| CarInfo {
-                id: id as u32 + 1,
-                team: if player.team_num < 0.5 { Team::Blue } else { Team::Orange },
+            .map(|id| (id, gym_state.cars.get(id).unwrap()))
+            .map(|(id, car)| CarInfo {
+                id: id.split('-').last().unwrap().parse::<u32>().unwrap() + 1,
+                team: Team::from_u8(car.team_num),
                 state: CarState {
-                    pos: player.car_data.position.into(),
-                    vel: player.car_data.linear_velocity.into(),
-                    ang_vel: player.car_data.angular_velocity.into(),
-                    rot_mat: Mat3::from_quat(array_to_quat(player.car_data.quaternion)).into(),
-                    is_on_ground: player.on_ground != 0,
-                    is_demoed: player.is_demoed != 0,
-                    has_flipped: player.has_flip == 0,
-                    has_jumped: player.has_jump == 0,
-                    boost: player.boost_amount,
+                    pos: car.physics.position.into(),
+                    vel: car.physics.linear_velocity.into(),
+                    ang_vel: car.physics.angular_velocity.into(),
+                    rot_mat: car.physics._rotation_mtx.unwrap().into(),
+                    is_demoed: car.demo_respawn_timer == 0.,
+                    boost: car.boost_amount * 100.,
                     ..Default::default()
                 },
                 config: OCTANE,

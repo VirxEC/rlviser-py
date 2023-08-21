@@ -1,6 +1,6 @@
 use core::panic;
 
-use glam::{Mat3, Quat, Vec3 as Vec3G};
+use glam::{Quat, Vec3 as Vec3G};
 use pyo3::FromPyObject;
 
 #[derive(Clone, Copy, Debug, Default, FromPyObject)]
@@ -57,23 +57,19 @@ impl RotMat {
     pub const IDENTITY: Self = Self::new(Vec3::X, Vec3::Y, Vec3::Z);
 
     #[inline]
-    pub const fn new(x_axis: Vec3, y_axis: Vec3, z_axis: Vec3) -> Self {
-        Self {
-            forward: x_axis,
-            right: y_axis,
-            up: z_axis,
-        }
+    pub const fn new(forward: Vec3, right: Vec3, up: Vec3) -> Self {
+        Self { forward, right, up }
     }
 }
 
-impl From<Mat3> for RotMat {
+impl From<[[f32; 3]; 3]> for RotMat {
     #[inline]
-    fn from(value: Mat3) -> Self {
-        Self {
-            forward: value.x_axis.into(),
-            right: value.y_axis.into(),
-            up: value.z_axis.into(),
-        }
+    fn from(value: [[f32; 3]; 3]) -> Self {
+        Self::new(
+            Vec3::new(value[0][0], value[1][0], value[2][0]),
+            Vec3::new(value[0][1], value[1][1], value[2][1]),
+            Vec3::new(value[0][2], value[1][2], value[2][2]),
+        )
     }
 }
 
