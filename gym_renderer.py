@@ -16,7 +16,6 @@ class RLViserRenderer(Renderer[GameState]):
 
     def render(self, state: GameState) -> Any:
         self.packet_id += 1
-        # print(state)
         rlviser.render_rlgym(self.packet_id, self.tick_rate, state)
 
     def close(self):

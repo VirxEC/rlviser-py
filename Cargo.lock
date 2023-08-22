@@ -175,10 +175,9 @@ dependencies = [
 
 [[package]]
 name = "rlviser-py"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "glam",
- "once_cell",
  "pyo3",
 ]
 

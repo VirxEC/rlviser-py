@@ -1,5 +1,3 @@
-use core::panic;
-
 use glam::{Quat, Vec3 as Vec3G};
 use pyo3::FromPyObject;
 
@@ -115,7 +113,7 @@ impl Team {
         match value {
             0 => Self::Blue,
             1 => Self::Orange,
-            _ => panic!("Invalid team value: {}", value),
+            _ => panic!("Invalid team value: {value}"),
         }
     }
 }
@@ -489,7 +487,7 @@ impl FromBytesExact for f32 {
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
-        f32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+        Self::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
     }
 }
 
@@ -498,7 +496,7 @@ impl FromBytesExact for u32 {
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
-        u32::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+        Self::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
     }
 }
 
@@ -507,7 +505,7 @@ impl FromBytesExact for u64 {
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
-        u64::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]])
+        Self::from_ne_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]])
     }
 }
 
@@ -516,7 +514,7 @@ impl FromBytesExact for Vec3 {
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
-        Vec3::new(
+        Self::new(
             f32::from_bytes(&bytes[..f32::NUM_BYTES]),
             f32::from_bytes(&bytes[f32::NUM_BYTES..f32::NUM_BYTES * 2]),
             f32::from_bytes(&bytes[f32::NUM_BYTES * 2..]),
@@ -529,7 +527,7 @@ impl FromBytesExact for RotMat {
 
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
-        RotMat {
+        Self {
             forward: Vec3::from_bytes(&bytes[..Vec3::NUM_BYTES]),
             right: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES..Vec3::NUM_BYTES * 2]),
             up: Vec3::from_bytes(&bytes[Vec3::NUM_BYTES * 2..]),
@@ -583,8 +581,8 @@ impl FromBytesExact for Team {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         match bytes[0] {
-            0 => Team::Blue,
-            1 => Team::Orange,
+            0 => Self::Blue,
+            1 => Self::Orange,
             _ => unreachable!(),
         }
     }

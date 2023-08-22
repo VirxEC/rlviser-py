@@ -1,10 +1,9 @@
 use crate::bytes::{GameState, ToBytes};
-use once_cell::sync::Lazy;
 use std::{
     io,
     net::{SocketAddr, UdpSocket},
     process::Command,
-    sync::RwLock,
+    sync::OnceLock,
 };
 
 #[repr(u8)]
@@ -15,7 +14,7 @@ enum UdpPacketTypes {
 
 const RLVISER_PATH: &str = if cfg!(windows) { "./rlviser.exe" } else { "./rlviser" };
 
-static SOCKET: RwLock<Lazy<(UdpSocket, SocketAddr)>> = RwLock::new(Lazy::new(|| init().unwrap()));
+static SOCKET: OnceLock<(UdpSocket, SocketAddr)> = OnceLock::new();
 
 pub fn init() -> io::Result<(UdpSocket, SocketAddr)> {
     // launch RLViser
@@ -40,8 +39,7 @@ pub fn init() -> io::Result<(UdpSocket, SocketAddr)> {
 }
 
 pub fn send_game_state(game_state: &GameState) -> io::Result<()> {
-    let socket_lock = SOCKET.read().unwrap();
-    let (socket, src) = &**socket_lock;
+    let (socket, src) = SOCKET.get_or_init(|| init().unwrap());
 
     socket.send_to(&[UdpPacketTypes::GameState as u8], src)?;
     socket.send_to(&game_state.to_bytes(), src)?;
@@ -50,9 +48,9 @@ pub fn send_game_state(game_state: &GameState) -> io::Result<()> {
 }
 
 pub fn quit() -> io::Result<()> {
-    let socket_lock = SOCKET.read().unwrap();
-    let (socket, src) = &**socket_lock;
+    if let Some((socket, src)) = SOCKET.get() {
+        socket.send_to(&[UdpPacketTypes::Quit as u8], src)?;
+    }
 
-    socket.send_to(&[UdpPacketTypes::Quit as u8], src)?;
     Ok(())
 }

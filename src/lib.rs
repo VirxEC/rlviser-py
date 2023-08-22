@@ -92,7 +92,7 @@ fn render_rlgym(tick_count: u64, tick_rate: f32, gym_state: GymState) {
             .zip(gym_state.boost_pad_timers)
             .map(|(position, time)| BoostPad {
                 position,
-                is_big: position.z == 73.,
+                is_big: (position.z - 73.).abs() < f32::EPSILON,
                 state: BoostPadState {
                     is_active: time == 0.,
                     ..Default::default()
@@ -143,7 +143,7 @@ fn render(
             .zip(boost_pad_states)
             .map(|(position, is_active)| BoostPad {
                 position,
-                is_big: position.z == 73.,
+                is_big: (position.z - 73.).abs() < f32::EPSILON,
                 state: BoostPadState {
                     is_active,
                     ..Default::default()
