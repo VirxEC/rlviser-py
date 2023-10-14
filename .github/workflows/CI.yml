@@ -33,6 +33,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          rust-toolchain: "stable"
           args: --release --out dist --find-interpreter
           sccache: 'true'
           manylinux: auto
@@ -57,6 +58,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          rust-toolchain: "stable"
           args: --release --out dist --find-interpreter
           sccache: 'true'
       - name: Upload wheels
@@ -79,6 +81,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          rust-toolchain: "stable"
           args: --release --out dist --find-interpreter
           sccache: 'true'
       - name: Upload wheels
@@ -95,7 +98,9 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
+          rust-toolchain: "stable"
           args: --out dist
+          sccache: 'true'
       - name: Upload sdist
         uses: actions/upload-artifact@v3
         with:
@@ -117,4 +122,6 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         with:
           command: upload
+          rust-toolchain: "stable"
           args: --skip-existing *
+          sccache: 'true'
