@@ -1,10 +1,9 @@
 from typing import Any
 
 import rlviser_py as rlviser
-
-from rlgym.api.engine.renderer import Renderer
+from rlgym.api.config.renderer import Renderer
+from rlgym.rocket_league.api.game_state import GameState
 from rlgym.rocket_league.common_values import BOOST_LOCATIONS
-from rlgym.rocket_league.engine.game_state import GameState
 
 
 class RLViserRenderer(Renderer[GameState]):
@@ -14,7 +13,7 @@ class RLViserRenderer(Renderer[GameState]):
         self.tick_rate = tick_rate
         self.packet_id = 0
 
-    def render(self, state: GameState) -> Any:
+    def render(self, state: GameState, _) -> Any:
         self.packet_id += 1
         rlviser.render_rlgym(self.packet_id, self.tick_rate, state)
 

@@ -6,11 +6,10 @@ use crate::{
     bytes::{BoostPad, BoostPadState},
     gym::GymState,
 };
-use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, Vec3, WheelPairConfig};
-use glam::Quat;
+use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, HeatseekerInfo, Team, Vec3, WheelPairConfig};
 use gym::BOOST_PADS_LENGTH;
 use pyo3::prelude::*;
-use std::{collections::HashMap, sync::RwLock};
+use std::{cell::RefCell, collections::HashMap};
 
 macro_rules! pynamedmodule {
     (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*], classes: [$($class_name:ident),*]) => {
@@ -37,17 +36,18 @@ pynamedmodule! {
     classes: []
 }
 
-static BOOST_PAD_LOCATIONS: RwLock<[Vec3; BOOST_PADS_LENGTH]> = RwLock::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
+thread_local! {
+    static BOOST_PAD_LOCATIONS: RefCell<[Vec3; BOOST_PADS_LENGTH]> = RefCell::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
+}
 
 /// Set the boost pad locations to send to RLViser in each packet
 #[pyfunction]
 fn set_boost_pad_locations(locations: [[f32; 3]; BOOST_PADS_LENGTH]) {
-    BOOST_PAD_LOCATIONS
-        .write()
-        .unwrap()
-        .iter_mut()
-        .zip(locations)
-        .for_each(|(rloc, pyloc)| *rloc = Vec3::from_array(pyloc));
+    BOOST_PAD_LOCATIONS.with_borrow_mut(|locs| {
+        locs.iter_mut()
+            .zip(locations)
+            .for_each(|(rloc, pyloc)| *rloc = Vec3::from_array(pyloc));
+    });
 }
 
 pub const OCTANE: CarConfig = CarConfig {
@@ -81,24 +81,24 @@ fn render_rlgym(tick_count: u64, tick_rate: f32, gym_state: GymState) {
         tick_rate,
         ball: BallState {
             pos: gym_state.ball.position.into(),
+            rot_mat: gym_state.ball._rotation_mtx.unwrap_or_default().into(),
             vel: gym_state.ball.linear_velocity.into(),
             ang_vel: gym_state.ball.angular_velocity.into(),
+            hs_info: HeatseekerInfo::default(),
         },
-        ball_rot: Quat::IDENTITY,
-        pads: BOOST_PAD_LOCATIONS
-            .read()
-            .unwrap()
-            .into_iter()
-            .zip(gym_state.boost_pad_timers)
-            .map(|(position, time)| BoostPad {
-                position,
-                is_big: (position.z - 73.).abs() < f32::EPSILON,
-                state: BoostPadState {
-                    is_active: time == 0.,
-                    ..Default::default()
-                },
-            })
-            .collect(),
+        pads: BOOST_PAD_LOCATIONS.with_borrow(|locs| {
+            locs.iter()
+                .zip(gym_state.boost_pad_timers)
+                .map(|(position, time)| BoostPad {
+                    position: *position,
+                    is_big: (position.z - 73.).abs() < f32::EPSILON,
+                    state: BoostPadState {
+                        is_active: time == 0.,
+                        ..Default::default()
+                    },
+                })
+                .collect()
+        }),
         cars: get_sorted_ids(&gym_state.cars)
             .into_iter()
             .map(|id| (id, gym_state.cars.get(id).unwrap()))
@@ -128,28 +128,25 @@ fn render(
     tick_rate: f32,
     boost_pad_states: [bool; BOOST_PADS_LENGTH],
     ball: BallState,
-    ball_rot: [f32; 4],
     cars: Vec<(u32, u8, CarConfig, CarState)>,
 ) {
     let game_state = GameState {
         tick_count,
         tick_rate,
         ball,
-        ball_rot: Quat::from_array(ball_rot),
-        pads: BOOST_PAD_LOCATIONS
-            .read()
-            .unwrap()
-            .into_iter()
-            .zip(boost_pad_states)
-            .map(|(position, is_active)| BoostPad {
-                position,
-                is_big: (position.z - 73.).abs() < f32::EPSILON,
-                state: BoostPadState {
-                    is_active,
-                    ..Default::default()
-                },
-            })
-            .collect(),
+        pads: BOOST_PAD_LOCATIONS.with_borrow(|locs| {
+            locs.iter()
+                .zip(boost_pad_states)
+                .map(|(position, is_active)| BoostPad {
+                    position: *position,
+                    is_big: (position.z - 73.).abs() < f32::EPSILON,
+                    state: BoostPadState {
+                        is_active,
+                        ..Default::default()
+                    },
+                })
+                .collect()
+        }),
         cars: cars
             .into_iter()
             .map(|(id, team, config, state)| CarInfo {

@@ -6,7 +6,7 @@ def set_boost_pad_locations(locations: List[Tuple[float, float, float]]) -> ...:
 try:
     from RocketSim import BallState, CarConfig, CarState, Team
 
-    def render(tick_count: int, tick_rate: float, boost_pad_states: List[bool], ball: BallState, ball_rot: Tuple[float, float, float, float], cars: List[Tuple[int, Team, CarConfig, CarState]]) -> ...:
+    def render(tick_count: int, tick_rate: float, boost_pad_states: List[bool], ball: BallState, cars: List[Tuple[int, Team, CarConfig, CarState]]) -> ...:
         pass
 except ImportError:
     pass
