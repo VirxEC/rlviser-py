@@ -16,10 +16,11 @@ arena.ball.set_state(rs.BallState(pos=rs.Vec(y=400, z=100), ang_vel=rs.Vec(x=5))
 car.set_controls(rs.CarControls(throttle=1, steer=1, boost=True))
 
 # Run for 3 seconds
+TIME = 3
 
 steps = 0
 starttime = time.time()
-for i in range(round(3 * arena.tick_rate)):
+for i in range(round(TIME * arena.tick_rate)):
     arena.step(1)
 
     # Render the current game state
