@@ -2,18 +2,17 @@ mod bytes;
 mod socket;
 
 use crate::bytes::{BoostPad, BoostPadState};
-use bytes::{BallState, CarConfig, CarInfo, CarState, GameState, Team, Vec3};
+use bytes::{BallState, CarConfig, CarInfo, CarState, FromBytes, GameMode, GameState, Team, Vec3};
 use core::cell::RefCell;
 use pyo3::prelude::*;
 
 macro_rules! pynamedmodule {
-    (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*], classes: [$($class_name:ident),*]) => {
+    (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*]) => {
         #[doc = $doc]
         #[pymodule]
         #[allow(redundant_semicolons)]
         fn $name(_py: Python, m: &PyModule) -> PyResult<()> {
             $(m.add_function(wrap_pyfunction!($func_name, m)?)?);*;
-            $(m.add_class::<$class_name>()?);*;
             Ok(())
         }
     };
@@ -28,8 +27,7 @@ pynamedmodule! {
         set_boost_pad_locations,
         render,
         quit
-    ],
-    classes: []
+    ]
 }
 
 thread_local! {
@@ -50,6 +48,7 @@ fn set_boost_pad_locations(locations: [[f32; 3]; BOOST_PADS_LENGTH]) {
 fn render(
     tick_count: u64,
     tick_rate: f32,
+    game_mode: u8,
     boost_pad_states: [bool; BOOST_PADS_LENGTH],
     ball: BallState,
     cars: Vec<(u32, u8, CarConfig, CarState)>,
@@ -57,6 +56,7 @@ fn render(
     let game_state = GameState {
         tick_count,
         tick_rate,
+        game_mode: GameMode::from_bytes(&[game_mode]),
         ball,
         pads: BOOST_PAD_LOCATIONS.with_borrow(|locs| {
             locs.iter()
