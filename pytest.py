@@ -3,7 +3,7 @@ import time
 import rlviser_py as vis
 import RocketSim as rs
 
-game_mode = rs.GameMode.SOCCAR
+game_mode = rs.GameMode.HOOPS
 
 # Create example arena
 arena = rs.Arena(game_mode)

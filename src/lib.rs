@@ -18,8 +18,6 @@ macro_rules! pynamedmodule {
     };
 }
 
-pub const BOOST_PADS_LENGTH: usize = 34;
-
 pynamedmodule! {
     doc: "rlviser_py is a module for interacting with RLViser from Python",
     name: rlviser_py,
@@ -31,13 +29,14 @@ pynamedmodule! {
 }
 
 thread_local! {
-    static BOOST_PAD_LOCATIONS: RefCell<[Vec3; BOOST_PADS_LENGTH]> = RefCell::new([Vec3::ZERO; BOOST_PADS_LENGTH]);
+    static BOOST_PAD_LOCATIONS: RefCell<Vec<Vec3>> = RefCell::new(Vec::new());
 }
 
 /// Set the boost pad locations to send to RLViser in each packet
 #[pyfunction]
-fn set_boost_pad_locations(locations: [[f32; 3]; BOOST_PADS_LENGTH]) {
+fn set_boost_pad_locations(locations: Vec<[f32; 3]>) {
     BOOST_PAD_LOCATIONS.with_borrow_mut(|locs| {
+        locs.resize(locations.len(), Vec3::ZERO);
         locs.iter_mut()
             .zip(locations)
             .for_each(|(rloc, pyloc)| *rloc = Vec3::from_array(pyloc));
@@ -49,7 +48,7 @@ fn render(
     tick_count: u64,
     tick_rate: f32,
     game_mode: u8,
-    boost_pad_states: [bool; BOOST_PADS_LENGTH],
+    boost_pad_states: Vec<bool>,
     ball: BallState,
     cars: Vec<(u32, u8, CarConfig, CarState)>,
 ) {
