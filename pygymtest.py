@@ -57,5 +57,4 @@ for _ in range(2):
         steps += 1
 
     ep_time = time.time() - t0
-    print("Steps per second: {:.0f} | Episode time: {:.2f} | Episode Reward: {:.2f}".format(
-        steps / ep_time, ep_time, max(ep_reward.values())))
+    print(f"Steps per second: {steps / ep_time:.0f} | Episode time: {ep_time:.2f} | Episode Reward: {max(ep_reward.values()):.2f}")
