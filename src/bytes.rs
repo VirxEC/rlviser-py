@@ -1,4 +1,3 @@
-use glam::Vec3 as Vec3G;
 use pyo3::FromPyObject;
 
 #[repr(u8)]
@@ -38,13 +37,6 @@ impl From<[f32; 3]> for Vec3 {
     #[inline]
     fn from(value: [f32; 3]) -> Self {
         Self::from_array(value)
-    }
-}
-
-impl From<Vec3G> for Vec3 {
-    #[inline]
-    fn from(value: Vec3G) -> Self {
-        Self::new(value.x, value.y, value.z)
     }
 }
 

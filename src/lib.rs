@@ -3,8 +3,7 @@
 mod bytes;
 mod socket;
 
-use crate::bytes::{BoostPad, BoostPadState};
-use bytes::{BallState, CarConfig, CarInfo, CarState, FromBytes, GameMode, GameState, Team, Vec3};
+use bytes::{BallState, BoostPad, BoostPadState, CarConfig, CarInfo, CarState, FromBytes, GameMode, GameState, Team, Vec3};
 use core::cell::RefCell;
 use pyo3::prelude::*;
 
