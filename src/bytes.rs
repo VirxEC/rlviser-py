@@ -228,7 +228,7 @@ pub struct CarInfo {
     pub config: CarConfig,
 }
 
-pub type TCar = (u32, TVec3, TRotMat, TVec3, TVec3, f32, bool, bool, bool);
+pub type TCar = (u32, TVec3, TRotMat, TVec3, TVec3, f32, bool, bool, bool, f32);
 
 impl CarInfo {
     #[inline]
@@ -243,6 +243,7 @@ impl CarInfo {
             self.state.has_jumped,
             self.state.has_double_jumped,
             self.state.has_flipped,
+            self.state.demo_respawn_timer,
         )
     }
 }
