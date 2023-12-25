@@ -18,6 +18,8 @@ pub struct Vec3 {
     pub z: f32,
 }
 
+pub type TVec3 = [f32; 3];
+
 impl Vec3 {
     pub const ZERO: Self = Self::new(0., 0., 0.);
     pub const X: Self = Self::new(1., 0., 0.);
@@ -28,14 +30,18 @@ impl Vec3 {
         Self { x, y, z }
     }
 
-    pub const fn from_array(array: [f32; 3]) -> Self {
+    pub const fn from_array(array: TVec3) -> Self {
         Self::new(array[0], array[1], array[2])
+    }
+
+    pub const fn to_array(self) -> TVec3 {
+        [self.x, self.y, self.z]
     }
 }
 
-impl From<[f32; 3]> for Vec3 {
+impl From<TVec3> for Vec3 {
     #[inline]
-    fn from(value: [f32; 3]) -> Self {
+    fn from(value: TVec3) -> Self {
         Self::from_array(value)
     }
 }
@@ -46,6 +52,8 @@ pub struct RotMat {
     pub right: Vec3,
     pub up: Vec3,
 }
+
+pub type TRotMat = [TVec3; 3];
 
 impl Default for RotMat {
     #[inline]
@@ -61,11 +69,15 @@ impl RotMat {
     pub const fn new(forward: Vec3, right: Vec3, up: Vec3) -> Self {
         Self { forward, right, up }
     }
+
+    pub const fn to_array(self) -> TRotMat {
+        [self.forward.to_array(), self.right.to_array(), self.up.to_array()]
+    }
 }
 
-impl From<[[f32; 3]; 3]> for RotMat {
+impl From<TRotMat> for RotMat {
     #[inline]
-    fn from(value: [[f32; 3]; 3]) -> Self {
+    fn from(value: TRotMat) -> Self {
         Self::new(
             Vec3::new(value[0][0], value[1][0], value[2][0]),
             Vec3::new(value[0][1], value[1][1], value[2][1]),
@@ -96,6 +108,8 @@ pub struct BallState {
     pub heatseeker_time_since_hit: f32,
 }
 
+pub type TBall = (TVec3, TRotMat, TVec3, TVec3);
+
 impl Default for BallState {
     #[inline]
     fn default() -> Self {
@@ -109,6 +123,18 @@ impl Default for BallState {
             heatseeker_target_speed: 2900.,
             heatseeker_time_since_hit: 0.,
         }
+    }
+}
+
+impl BallState {
+    #[inline]
+    pub fn to_array(self) -> TBall {
+        (
+            self.pos.to_array(),
+            self.rot_mat.to_array(),
+            self.vel.to_array(),
+            self.ang_vel.to_array(),
+        )
     }
 }
 
@@ -200,6 +226,25 @@ pub struct CarInfo {
     pub team: Team,
     pub state: CarState,
     pub config: CarConfig,
+}
+
+pub type TCar = (u32, TVec3, TRotMat, TVec3, TVec3, f32, bool, bool, bool);
+
+impl CarInfo {
+    #[inline]
+    pub fn to_array(self) -> TCar {
+        (
+            self.id,
+            self.state.pos.to_array(),
+            self.state.rot_mat.to_array(),
+            self.state.vel.to_array(),
+            self.state.ang_vel.to_array(),
+            self.state.boost,
+            self.state.has_jumped,
+            self.state.has_double_jumped,
+            self.state.has_flipped,
+        )
+    }
 }
 
 #[derive(Clone, Copy, Default, Debug)]
@@ -591,6 +636,14 @@ impl GameState {
     pub const MIN_NUM_BYTES: usize = u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES * 2;
 
     #[inline]
+    pub fn get_num_bytes(bytes: &[u8]) -> usize {
+        Self::MIN_NUM_BYTES
+            + BallState::NUM_BYTES
+            + Self::read_num_pads(bytes) * BoostPad::NUM_BYTES
+            + Self::read_num_cars(bytes) * CarInfo::NUM_BYTES
+    }
+
+    #[inline]
     pub fn read_tick_count(bytes: &[u8]) -> u64 {
         u64::from_bytes(&bytes[..u64::NUM_BYTES])
     }
@@ -602,13 +655,18 @@ impl GameState {
 
     #[inline]
     pub fn read_game_mode(bytes: &[u8]) -> GameMode {
-        GameMode::from_bytes(&bytes[(u64::NUM_BYTES + f32::NUM_BYTES)..=(u64::NUM_BYTES + f32::NUM_BYTES)])
+        GameMode::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES..u64::NUM_BYTES + f32::NUM_BYTES + 1])
     }
 
     #[inline]
     pub fn read_num_pads(bytes: &[u8]) -> usize {
         u32::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES + 1..u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES])
             as usize
+    }
+
+    #[inline]
+    pub fn read_num_cars(bytes: &[u8]) -> usize {
+        u32::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES..Self::MIN_NUM_BYTES]) as usize
     }
 }
 

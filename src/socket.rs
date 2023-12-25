@@ -1,4 +1,4 @@
-use crate::bytes::{GameState, ToBytes};
+use crate::bytes::{FromBytes, GameState, ToBytes};
 use std::{
     io,
     net::{SocketAddr, UdpSocket},
@@ -36,6 +36,36 @@ pub fn init() -> io::Result<(UdpSocket, SocketAddr)> {
     socket.set_nonblocking(true)?;
 
     Ok((socket, src))
+}
+
+pub fn get_state_set() -> Option<GameState> {
+    let (socket, _) = SOCKET.get()?;
+
+    let mut min_state_set_buf = [0; GameState::MIN_NUM_BYTES];
+    let mut state_set_buf = Vec::new();
+
+    while let Ok((num_bytes, _)) = socket.peek_from(&mut min_state_set_buf) {
+        if num_bytes == 1 {
+            // We got a connection and not a game state
+            // So clear the byte from the socket buffer and return
+            let mut buf = [0];
+            socket.recv_from(&mut buf).ok()?;
+            continue;
+        }
+
+        // the socket sent data back
+        // this is the other side telling us to update the game state
+        let num_bytes = GameState::get_num_bytes(&min_state_set_buf);
+        state_set_buf = vec![0; num_bytes];
+        socket.recv_from(&mut state_set_buf).ok()?;
+    }
+
+    // the socket didn't send data back
+    if state_set_buf.is_empty() {
+        return None;
+    }
+
+    Some(GameState::from_bytes(&state_set_buf))
 }
 
 pub fn send_game_state(game_state: &GameState) -> io::Result<()> {

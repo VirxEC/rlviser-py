@@ -3,7 +3,10 @@
 mod bytes;
 mod socket;
 
-use bytes::{BallState, BoostPad, BoostPadState, CarConfig, CarInfo, CarState, FromBytes, GameMode, GameState, Team, Vec3};
+use bytes::{
+    BallState, BoostPad, BoostPadState, CarConfig, CarInfo, CarState, FromBytes, GameMode, GameState, TBall, TCar, Team,
+    Vec3,
+};
 use core::cell::RefCell;
 use pyo3::prelude::*;
 
@@ -24,6 +27,7 @@ pynamedmodule! {
     name: rlviser_py,
     funcs: [
         set_boost_pad_locations,
+        get_state_set,
         render,
         quit
     ]
@@ -45,14 +49,19 @@ fn set_boost_pad_locations(locations: Vec<[f32; 3]>) {
 }
 
 #[pyfunction]
-fn render(
-    tick_count: u64,
-    tick_rate: f32,
-    game_mode: u8,
-    boost_pad_states: Vec<bool>,
-    ball: BallState,
-    cars: Vec<(u32, u8, CarConfig, CarState)>,
-) {
+fn get_state_set() -> Option<(Vec<f32>, TBall, Vec<TCar>)> {
+    let game_state = socket::get_state_set()?;
+
+    let pads = game_state.pads.into_iter().map(|pad| pad.state.cooldown).collect::<Vec<_>>();
+    let cars = game_state.cars.into_iter().map(CarInfo::to_array).collect::<Vec<_>>();
+
+    Some((pads, game_state.ball.to_array(), cars))
+}
+
+type Car = (u32, u8, CarConfig, CarState);
+
+#[pyfunction]
+fn render(tick_count: u64, tick_rate: f32, game_mode: u8, boost_pad_states: Vec<bool>, ball: BallState, cars: Vec<Car>) {
     let game_state = GameState {
         tick_count,
         tick_rate,
