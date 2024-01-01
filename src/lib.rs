@@ -11,12 +11,13 @@ use core::cell::RefCell;
 use pyo3::prelude::*;
 
 macro_rules! pynamedmodule {
-    (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*]) => {
+    (doc: $doc:literal, name: $name:tt, funcs: [$($func_name:path),*], vars: [$(($var_name:literal, $value:expr)),*]) => {
         #[doc = $doc]
         #[pymodule]
         #[allow(redundant_semicolons)]
         fn $name(_py: Python, m: &PyModule) -> PyResult<()> {
             $(m.add_function(wrap_pyfunction!($func_name, m)?)?);*;
+            $(m.add($var_name, $value)?);*;
             Ok(())
         }
     };
@@ -30,6 +31,9 @@ pynamedmodule! {
         get_state_set,
         render,
         quit
+    ],
+    vars: [
+        ("__version__", env!("CARGO_PKG_VERSION"))
     ]
 }
 
