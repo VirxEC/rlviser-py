@@ -15,8 +15,8 @@ macro_rules! pynamedmodule {
         #[doc = $doc]
         #[pymodule]
         #[allow(redundant_semicolons)]
-        fn $name(_py: Python, m: &PyModule) -> PyResult<()> {
-            $(m.add_function(wrap_pyfunction!($func_name, m)?)?);*;
+        fn $name(_py: Python, m: Bound<PyModule>) -> PyResult<()> {
+            $(m.add_function(wrap_pyfunction!($func_name, &m)?)?);*;
             $(m.add($var_name, $value)?);*;
             Ok(())
         }
@@ -38,7 +38,7 @@ pynamedmodule! {
 }
 
 thread_local! {
-    static BOOST_PAD_LOCATIONS: RefCell<Vec<Vec3>> = RefCell::new(Vec::new());
+    static BOOST_PAD_LOCATIONS: RefCell<Vec<Vec3>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Set the boost pad locations to send to RLViser in each packet
