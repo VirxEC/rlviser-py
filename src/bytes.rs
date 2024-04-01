@@ -128,7 +128,7 @@ impl Default for BallState {
 
 impl BallState {
     #[inline]
-    pub fn to_array(self) -> TBall {
+    pub const fn to_array(self) -> TBall {
         (
             self.pos.to_array(),
             self.rot_mat.to_array(),
@@ -232,7 +232,7 @@ pub type TCar = (u32, TVec3, TRotMat, TVec3, TVec3, f32, bool, bool, bool, f32);
 
 impl CarInfo {
     #[inline]
-    pub fn to_array(self) -> TCar {
+    pub const fn to_array(self) -> TCar {
         (
             self.id,
             self.state.pos.to_array(),

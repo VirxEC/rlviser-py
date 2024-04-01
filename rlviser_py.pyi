@@ -1,11 +1,23 @@
 from typing import Sequence, Optional, Tuple
 
-from RocketSim import BallState, CarConfig, CarState, GameMode, Team
+from RocketSim import BallState, CarState, GameMode
 
 type TVec3 = Tuple[float, float, float]
+"""
+The items are (X, Y, Z) respectively
+"""
 type TRotmat = Tuple[TVec3, TVec3, TVec3]
+"""
+The items are (forward, right, up) respectively
+"""
 type TBall = Tuple[TVec3, TRotmat, TVec3, TVec3]
+"""
+The items are (location, rotation, velocity, angular velocity) respectively
+"""
 type TCar = Tuple[int, TVec3, TRotmat, TVec3, TVec3, float, bool, bool, bool, float]
+"""
+The items are (car_id, location, rotation, velocity, angular velocity, boost, has jumped, has double jumped, has flipped, demo respawn timer) respectively
+"""
 
 def set_boost_pad_locations(locations: Sequence[TVec3]) -> ...:
     pass

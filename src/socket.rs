@@ -6,6 +6,8 @@ use std::{
     sync::OnceLock,
 };
 
+const ROCKETSIM_PORT: u16 = 34254;
+
 #[repr(u8)]
 enum UdpPacketTypes {
     Quit,
@@ -23,7 +25,7 @@ pub fn init() -> io::Result<(UdpSocket, SocketAddr)> {
     }
 
     // Connect to RLViser
-    let socket = UdpSocket::bind("0.0.0.0:34254")?;
+    let socket = UdpSocket::bind(("0.0.0.0", ROCKETSIM_PORT))?;
 
     println!("Waiting for connection to socket...");
     let mut buf = [0; 1];
