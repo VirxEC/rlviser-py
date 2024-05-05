@@ -1,3 +1,4 @@
+use core::fmt;
 use pyo3::FromPyObject;
 
 #[repr(u8)]
@@ -98,11 +99,11 @@ pub struct BallHitInfo {
 
 #[derive(Clone, Copy, Debug, FromPyObject)]
 pub struct BallState {
-    pub update_counter: u64,
     pub pos: Vec3,
     pub rot_mat: RotMat,
     pub vel: Vec3,
     pub ang_vel: Vec3,
+    pub update_counter: u64,
     pub heatseeker_target_dir: f32,
     pub heatseeker_target_speed: f32,
     pub heatseeker_time_since_hit: f32,
@@ -187,16 +188,17 @@ pub struct CarControls {
 
 #[derive(Clone, Copy, Debug, Default, FromPyObject)]
 pub struct CarState {
-    pub update_counter: u64,
     pub pos: Vec3,
     pub rot_mat: RotMat,
     pub vel: Vec3,
     pub ang_vel: Vec3,
+    pub update_counter: u64,
     pub is_on_ground: bool,
+    pub wheels_with_contact: [bool; 4],
     pub has_jumped: bool,
     pub has_double_jumped: bool,
     pub has_flipped: bool,
-    pub last_rel_dodge_torque: Vec3,
+    pub flip_rel_torque: Vec3,
     pub jump_time: f32,
     pub flip_time: f32,
     pub is_flipping: bool,
@@ -299,6 +301,7 @@ impl<'a> ByteReader<'a> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn debug_assert_num_bytes(&self, num_bytes: usize) {
         debug_assert_eq!(self.idx, num_bytes, "ByteReader::debug_assert_num_bytes() failed");
     }
@@ -326,6 +329,28 @@ impl FromBytes for f32 {
     }
 }
 
+impl FromBytesExact for u8 {
+    const NUM_BYTES: usize = 1;
+}
+
+impl FromBytes for u8 {
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Self {
+        bytes[0]
+    }
+}
+
+impl FromBytesExact for u16 {
+    const NUM_BYTES: usize = 2;
+}
+
+impl FromBytes for u16 {
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Self {
+        Self::from_le_bytes([bytes[0], bytes[1]])
+    }
+}
+
 impl FromBytesExact for u32 {
     const NUM_BYTES: usize = 4;
 }
@@ -345,6 +370,31 @@ impl FromBytes for u64 {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Self {
         Self::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]])
+    }
+}
+
+impl FromBytesExact for i32 {
+    const NUM_BYTES: usize = 4;
+}
+
+impl FromBytes for i32 {
+    #[inline]
+    fn from_bytes(bytes: &[u8]) -> Self {
+        Self::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
+    }
+}
+
+impl<T: FromBytesExact + fmt::Debug, const N: usize> FromBytesExact for [T; N] {
+    const NUM_BYTES: usize = T::NUM_BYTES * N;
+}
+
+impl<T: FromBytesExact + fmt::Debug, const N: usize> FromBytes for [T; N] {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut reader = ByteReader::new(bytes);
+
+        let items = (0..N).map(|_| reader.read()).collect::<Vec<T>>();
+        reader.debug_assert_num_bytes(Self::NUM_BYTES);
+        items.try_into().unwrap()
     }
 }
 
@@ -438,41 +488,39 @@ impl<const N: usize> ByteWriter<N> {
     }
 }
 
-impl ToBytesExact<{ Self::NUM_BYTES }> for bool {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        [u8::from(*self)]
+impl ToBytesExact<{ bool::NUM_BYTES * 4 }> for [bool; 4] {
+    fn to_bytes(&self) -> [u8; bool::NUM_BYTES * 4] {
+        let mut writer = ByteWriter::<{ bool::NUM_BYTES * 4 }>::new();
+        for item in self {
+            writer.write(item);
+        }
+        writer.inner()
     }
 }
 
-impl ToBytesExact<{ Self::NUM_BYTES }> for u32 {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        self.to_le_bytes()
-    }
+macro_rules! impl_to_bytes_exact_via_std {
+    ($($t:ty),+) => {
+        $(impl ToBytesExact<{ Self::NUM_BYTES }> for $t {
+            fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
+                self.to_le_bytes()
+            }
+        })+
+    };
 }
 
-impl ToBytesExact<{ Self::NUM_BYTES }> for u64 {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        self.to_le_bytes()
-    }
+impl_to_bytes_exact_via_std!(u8, u16, u32, u64, i32, f32);
+
+macro_rules! impl_to_bytes_exact_as_u8 {
+    ($($t:ty),+) => {
+        $(impl ToBytesExact<{ Self::NUM_BYTES }> for $t {
+            fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
+                [*self as u8]
+            }
+        })+
+    };
 }
 
-impl ToBytesExact<{ Self::NUM_BYTES }> for f32 {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        self.to_le_bytes()
-    }
-}
-
-impl ToBytesExact<{ Self::NUM_BYTES }> for Team {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        [*self as u8]
-    }
-}
-
-impl ToBytesExact<{ Self::NUM_BYTES }> for GameMode {
-    fn to_bytes(&self) -> [u8; Self::NUM_BYTES] {
-        [*self as u8]
-    }
-}
+impl_to_bytes_exact_as_u8!(bool, Team, GameMode);
 
 macro_rules! impl_to_bytes_exact {
     ($t:ty, $($p:ident),+) => {
@@ -550,8 +598,8 @@ impl_bytes_exact!(
     u64::NUM_BYTES
         + Vec3::NUM_BYTES * 5
         + RotMat::NUM_BYTES
-        + 10
-        + f32::NUM_BYTES * 11
+        + 14
+        + f32::NUM_BYTES * 12
         + u32::NUM_BYTES
         + BallHitInfo::NUM_BYTES
         + CarControls::NUM_BYTES,
@@ -561,10 +609,11 @@ impl_bytes_exact!(
     vel,
     ang_vel,
     is_on_ground,
+    wheels_with_contact,
     has_jumped,
     has_double_jumped,
     has_flipped,
-    last_rel_dodge_torque,
+    flip_rel_torque,
     jump_time,
     flip_time,
     is_flipping,

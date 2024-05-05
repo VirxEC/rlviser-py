@@ -29,6 +29,10 @@ pynamedmodule! {
     funcs: [
         set_boost_pad_locations,
         get_state_set,
+        get_game_speed,
+        get_game_paused,
+        report_game_speed,
+        report_game_paused,
         render,
         quit
     ],
@@ -39,6 +43,9 @@ pynamedmodule! {
 
 thread_local! {
     static BOOST_PAD_LOCATIONS: RefCell<Vec<Vec3>> = const { RefCell::new(Vec::new()) };
+    static GAME_STATE: RefCell<Option<GameState>> = const { RefCell::new(None) };
+    static GAME_SPEED: RefCell<f32> = const { RefCell::new(1.0) };
+    static GAME_PAUSED: RefCell<bool> = const { RefCell::new(false) };
 }
 
 /// Set the boost pad locations to send to RLViser in each packet
@@ -54,12 +61,76 @@ fn set_boost_pad_locations(locations: Vec<[f32; 3]>) {
 
 #[pyfunction]
 fn get_state_set() -> Option<(Vec<f32>, TBall, Vec<TCar>)> {
-    let game_state = socket::get_state_set()?;
+    let return_message = socket::get_return_messages();
+
+    if let Some(speed) = return_message.speed {
+        GAME_SPEED.with_borrow_mut(|speed_cell| *speed_cell = speed);
+    }
+
+    if let Some(paused) = return_message.paused {
+        GAME_PAUSED.with_borrow_mut(|paused_cell| *paused_cell = paused);
+    }
+
+    let game_state = return_message
+        .game_state
+        .or_else(|| GAME_STATE.with_borrow_mut(|state_cell| state_cell.take()))?;
 
     let pads = game_state.pads.into_iter().map(|pad| pad.state.cooldown).collect::<Vec<_>>();
     let cars = game_state.cars.into_iter().map(CarInfo::to_array).collect::<Vec<_>>();
 
     Some((pads, game_state.ball.to_array(), cars))
+}
+
+#[pyfunction]
+fn get_game_speed() -> f32 {
+    let return_message = socket::get_return_messages();
+
+    if let Some(paused) = return_message.paused {
+        GAME_PAUSED.with_borrow_mut(|paused_cell| *paused_cell = paused);
+    }
+
+    if let Some(game_state) = return_message.game_state {
+        GAME_STATE.with_borrow_mut(|state_cell| *state_cell = Some(game_state));
+    }
+
+    match return_message.speed {
+        Some(speed) => {
+            GAME_SPEED.with_borrow_mut(|speed_cell| *speed_cell = speed);
+            speed
+        }
+        None => GAME_SPEED.with_borrow(|speed_cell| *speed_cell),
+    }
+}
+
+#[pyfunction]
+fn get_game_paused() -> bool {
+    let return_message = socket::get_return_messages();
+
+    if let Some(speed) = return_message.speed {
+        GAME_SPEED.with_borrow_mut(|speed_cell| *speed_cell = speed);
+    }
+
+    if let Some(game_state) = return_message.game_state {
+        GAME_STATE.with_borrow_mut(|state_cell| *state_cell = Some(game_state));
+    }
+
+    match return_message.paused {
+        Some(paused) => {
+            GAME_PAUSED.with_borrow_mut(|paused_cell| *paused_cell = paused);
+            paused
+        }
+        None => GAME_PAUSED.with_borrow(|paused_cell| *paused_cell),
+    }
+}
+
+#[pyfunction]
+fn report_game_speed(speed: f32) {
+    socket::report_game_speed(speed).unwrap();
+}
+
+#[pyfunction]
+fn report_game_paused(paused: bool) {
+    socket::report_game_paused(paused).unwrap();
 }
 
 type Car = (u32, u8, CarConfig, CarState);
