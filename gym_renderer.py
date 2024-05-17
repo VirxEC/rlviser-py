@@ -46,6 +46,7 @@ class RLViserRenderer(Renderer[GameState]):
         car_state.demo_respawn_timer = car.demo_respawn_timer
         car_state.is_on_ground = car.on_ground
         car_state.supersonic_time = car.supersonic_time
+        # print(car.boost_amount)
         car_state.boost = car.boost_amount * 100
         car_state.time_spent_boosting = car.boost_active_time
         car_state.handbrake_val = car.handbrake

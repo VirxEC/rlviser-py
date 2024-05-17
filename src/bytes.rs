@@ -6,7 +6,7 @@ use pyo3::FromPyObject;
 pub enum GameMode {
     Soccar,
     Hoops,
-    Heatseeker,
+    HeatSeeker,
     Snowday,
     #[default]
     TheVoid,
@@ -203,6 +203,7 @@ pub struct CarState {
     pub flip_time: f32,
     pub is_flipping: bool,
     pub is_jumping: bool,
+    pub air_time: f32,
     pub air_time_since_jump: f32,
     pub boost: f32,
     pub time_spent_boosting: f32,
@@ -274,7 +275,6 @@ pub struct GameState {
     pub pads: Vec<BoostPad>,
     pub cars: Vec<CarInfo>,
 }
-
 pub trait FromBytes {
     fn from_bytes(bytes: &[u8]) -> Self;
 }
@@ -294,6 +294,7 @@ impl<'a> ByteReader<'a> {
         Self { idx: 0, bytes }
     }
 
+    #[track_caller]
     pub fn read<I: FromBytesExact>(&mut self) -> I {
         let item = I::from_bytes(&self.bytes[self.idx..self.idx + I::NUM_BYTES]);
         self.idx += I::NUM_BYTES;
@@ -423,7 +424,7 @@ impl FromBytes for GameMode {
         match bytes[0] {
             0 => Self::Soccar,
             1 => Self::Hoops,
-            2 => Self::Heatseeker,
+            2 => Self::HeatSeeker,
             3 => Self::Snowday,
             4 => Self::TheVoid,
             _ => unreachable!(),
@@ -461,7 +462,7 @@ macro_rules! impl_from_bytes_exact {
     };
 }
 
-trait ToBytesExact<const N: usize>: FromBytesExact {
+pub trait ToBytesExact<const N: usize>: FromBytesExact {
     fn to_bytes(&self) -> [u8; N];
 }
 
@@ -618,6 +619,7 @@ impl_bytes_exact!(
     flip_time,
     is_flipping,
     is_jumping,
+    air_time,
     air_time_since_jump,
     boost,
     time_spent_boosting,
@@ -685,6 +687,13 @@ impl FromBytes for GameState {
 impl GameState {
     pub const MIN_NUM_BYTES: usize = u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES * 2;
 
+    fn count_bytes(&self) -> usize {
+        Self::MIN_NUM_BYTES
+            + BallState::NUM_BYTES
+            + self.pads.len() * BoostPad::NUM_BYTES
+            + self.cars.len() * CarInfo::NUM_BYTES
+    }
+
     #[inline]
     pub fn get_num_bytes(bytes: &[u8]) -> usize {
         Self::MIN_NUM_BYTES
@@ -705,7 +714,7 @@ impl GameState {
 
     #[inline]
     pub fn read_game_mode(bytes: &[u8]) -> GameMode {
-        GameMode::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES..u64::NUM_BYTES + f32::NUM_BYTES + 1])
+        GameMode::from_bytes(&bytes[(u64::NUM_BYTES + f32::NUM_BYTES)..=(u64::NUM_BYTES + f32::NUM_BYTES)])
     }
 
     #[inline]
@@ -726,12 +735,7 @@ pub trait ToBytes {
 
 impl ToBytes for GameState {
     fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(
-            Self::MIN_NUM_BYTES
-                + BallState::NUM_BYTES
-                + self.pads.len() * BoostPad::NUM_BYTES
-                + self.cars.len() * CarInfo::NUM_BYTES,
-        );
+        let mut bytes = Vec::with_capacity(self.count_bytes());
 
         bytes.extend(self.tick_count.to_bytes());
         bytes.extend(self.tick_rate.to_bytes());
