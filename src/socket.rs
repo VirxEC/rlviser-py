@@ -91,7 +91,21 @@ impl SocketHandler {
 
             match packet_type {
                 UdpPacketTypes::GameState => {
-                    self.socket.peek_from(&mut min_game_state_buf)?;
+                    #[cfg(windows)]
+                    {
+                        while let Err(e) = self.socket.peek_from(&mut min_game_state_buf) {
+                            if let Some(code) = e.raw_os_error() {
+                                if code == 10040 {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    #[cfg(not(windows))]
+                    {
+                        while self.socket.peek_from(&mut min_game_state_buf).is_err() {}
+                    }
 
                     let num_bytes = GameState::get_num_bytes(&min_game_state_buf);
                     game_state_buffer.resize(num_bytes, 0);

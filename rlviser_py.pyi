@@ -1,20 +1,20 @@
-from typing import Sequence, Optional, Tuple
+from typing import Sequence, Optional
 
-from RocketSim import BallState, CarState, GameMode
+from RocketSim import BallState, CarState, GameMode, CarConfig
 
-type TVec3 = Tuple[float, float, float]
+type TVec3 = tuple[float, float, float]
 """
 The items are (X, Y, Z) respectively
 """
-type TRotmat = Tuple[TVec3, TVec3, TVec3]
+type TRotmat = tuple[TVec3, TVec3, TVec3]
 """
 The items are (forward, right, up) respectively
 """
-type TBall = Tuple[TVec3, TRotmat, TVec3, TVec3]
+type TBall = tuple[TVec3, TRotmat, TVec3, TVec3]
 """
 The items are (location, rotation, velocity, angular velocity) respectively
 """
-type TCar = Tuple[int, TVec3, TRotmat, TVec3, TVec3, float, bool, bool, bool, float]
+type TCar = tuple[int, TVec3, TRotmat, TVec3, TVec3, float, bool, bool, bool, float]
 """
 The items are (car_id, location, rotation, velocity, angular velocity, boost, has jumped, has double jumped, has flipped, demo respawn timer) respectively
 """
@@ -22,7 +22,7 @@ The items are (car_id, location, rotation, velocity, angular velocity, boost, ha
 def set_boost_pad_locations(locations: Sequence[TVec3]) -> ...:
     pass
 
-def get_state_set() -> Optional[Tuple[Sequence[float], TBall, Sequence[TCar]]]:
+def get_state_set() -> Optional[tuple[Sequence[float], TBall, Sequence[TCar]]]:
     """
     Sequence[float] - Boost pad states, 0 for full and some positive value for the time in seconds until it respawns
     TBall - Ball state
@@ -61,7 +61,12 @@ def report_game_paused(paused: bool) -> ...:
     """
     pass
 
-def render(tick_count: int, tick_rate: float, game_mode: GameMode, boost_pad_states: Sequence[bool], ball: BallState, cars: Sequence[Tuple[int, CarState]]) -> ...:
+type CarData = tuple[int, int, CarConfig, CarState]
+"""
+The items are (car_id, team, car_config, car_state) respectively
+"""
+
+def render(tick_count: int, tick_rate: float, game_mode: GameMode, boost_pad_states: Sequence[bool], ball: BallState, cars: Sequence[CarData]) -> ...:
     pass
 
 def quit() -> ...:

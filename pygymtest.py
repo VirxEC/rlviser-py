@@ -29,15 +29,15 @@ if __name__ == "__main__":
         state_mutator=MutatorSequence(
             FixedTeamSizeMutator(blue_size=2, orange_size=2), KickoffMutator()
         ),
-        obs_builder=DefaultObs(zero_padding=None),
-        action_parser=RepeatAction(LookupTableAction(), repeats=1),
+        obs_builder=DefaultObs(zero_padding=2),
+        action_parser=RepeatAction(LookupTableAction()),
         reward_fn=CombinedReward((GoalReward(), 10.0), (TouchReward(), 0.1)),
         termination_cond=GoalCondition(),
         truncation_cond=AnyCondition(
             TimeoutCondition(timeout=300.0), NoTouchTimeoutCondition(timeout=30.0)
         ),
         transition_engine=RocketSimEngine(),
-        renderer=RLViserRenderer(120),
+        renderer=RLViserRenderer(),
     )
 
     # simulate 2 episodes
@@ -48,17 +48,15 @@ if __name__ == "__main__":
         t0 = time.time()
         while True:
             actions = {}
-            for agent_id, action_space in env.action_spaces.items():
-                # agent.act(obs) | Your agent should go here
-                actions[agent_id] = np.random.randint(action_space, size=(1,))
+            for agent_id, (type, action_spaces) in env.action_spaces.items():
+                actions[agent_id] = np.random.randint(action_spaces, size=(1,))
 
-            for _ in range(8):
-                obs_dict, reward_dict, terminated_dict, truncated_dict = env.step(
-                    actions
-                )
-                env.render()
-                time.sleep(max(0, t0 + steps / (120 * game_speed) - time.time()))
-                steps += 1
+            obs_dict, reward_dict, terminated_dict, truncated_dict = env.step(
+                actions
+            )
+            env.render()
+            time.sleep(15 / 120 / game_speed)
+            steps += 1
 
             for agent_id, reward in reward_dict.items():
                 ep_reward[agent_id] += reward
