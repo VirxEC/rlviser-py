@@ -34,6 +34,7 @@ pynamedmodule! {
         report_game_speed,
         report_game_paused,
         render,
+        launch,
         quit
     ],
     vars: [
@@ -134,6 +135,11 @@ fn report_game_paused(paused: bool) {
 }
 
 type Car = (u32, u8, CarConfig, CarState);
+
+#[pyfunction]
+fn launch() {
+    socket::launch().unwrap();
+}
 
 #[pyfunction]
 fn render(tick_count: u64, tick_rate: f32, game_mode: u8, boost_pad_states: Vec<bool>, ball: BallState, cars: Vec<Car>) {

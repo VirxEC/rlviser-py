@@ -195,6 +195,14 @@ pub fn report_game_paused(paused: bool) -> io::Result<()> {
     Ok(())
 }
 
+pub fn launch() -> io::Result<()> {
+    if let Err(e) = Command::new(RLVISER_PATH).spawn() {
+        println!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
+    }
+
+    Ok(())
+}
+
 pub fn quit() -> io::Result<()> {
     if let Some(socket_handler) = SOCKET.get() {
         socket_handler.send_quit()?;

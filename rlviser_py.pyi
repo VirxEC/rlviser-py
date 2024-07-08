@@ -69,5 +69,10 @@ The items are (car_id, team, car_config, car_state) respectively
 def render(tick_count: int, tick_rate: float, game_mode: GameMode, boost_pad_states: Sequence[bool], ball: BallState, cars: Sequence[CarData]) -> ...:
     pass
 
+def launch():
+    """
+    Opens RLViser. Useful if `quit()` was called and you want to open it again.
+    """
+
 def quit() -> ...:
     pass

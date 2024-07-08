@@ -1,6 +1,6 @@
 [package]
 name = "rlviser-py"
-version = "0.6.8"
+version = "0.6.9"
 edition = "2021"
 description = "Python implementation that manages a UDP connection to RLViser"
 license = "MIT"
@@ -16,7 +16,7 @@ name = "rlviser_py"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.0"
+pyo3 = { version = "0.22.1", features = ["py-clone"] }
 
 [profile.release]
 lto = true
