@@ -1,7 +1,7 @@
 use crate::bytes::{FromBytes, GameState, ToBytes};
 use std::{
     io,
-    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+    net::{Ipv4Addr, SocketAddr, UdpSocket},
     process::Command,
     sync::OnceLock,
 };
@@ -65,11 +65,11 @@ impl SocketHandler {
             println!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
         }
 
-        let socket = UdpSocket::bind(("0.0.0.0", ROCKETSIM_PORT))?;
-        let rlviser_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), RLVISER_PORT);
+        let socket = UdpSocket::bind((Ipv4Addr::new(0, 0, 0, 0), ROCKETSIM_PORT))?;
+        let rlviser_addr = (Ipv4Addr::new(127, 0, 0, 1), RLVISER_PORT).into();
 
-        socket.set_nonblocking(true)?;
         socket.send_to(&[UdpPacketTypes::Connection as u8], rlviser_addr)?;
+        socket.set_nonblocking(true)?;
 
         Ok(Self { socket, rlviser_addr })
     }
@@ -91,36 +91,32 @@ impl SocketHandler {
 
             match packet_type {
                 UdpPacketTypes::GameState => {
-                    #[cfg(windows)]
-                    {
-                        while let Err(e) = self.socket.peek_from(&mut min_game_state_buf) {
-                            if let Some(code) = e.raw_os_error() {
-                                if code == 10040 {
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    self.socket.set_nonblocking(false)?;
 
-                    #[cfg(not(windows))]
-                    {
-                        while self.socket.peek_from(&mut min_game_state_buf).is_err() {}
-                    }
+                    let _ = self.socket.peek_from(&mut min_game_state_buf);
 
                     let num_bytes = GameState::get_num_bytes(&min_game_state_buf);
                     game_state_buffer.resize(num_bytes, 0);
                     self.socket.recv_from(&mut game_state_buffer)?;
 
+                    self.socket.set_nonblocking(true)?;
+
                     game_state = Some(GameState::from_bytes(&game_state_buffer));
                 }
                 UdpPacketTypes::Speed => {
+                    self.socket.set_nonblocking(false)?;
+
                     let mut speed_buffer = [0; 4];
                     self.socket.recv_from(&mut speed_buffer)?;
+
+                    self.socket.set_nonblocking(true)?;
 
                     speed = Some(f32::from_bytes(&speed_buffer));
                 }
                 UdpPacketTypes::Paused => {
+                    self.socket.set_nonblocking(false)?;
                     self.socket.recv_from(&mut byte_buffer)?;
+                    self.socket.set_nonblocking(true)?;
 
                     paused = Some(byte_buffer[0] == 1);
                 }
@@ -139,28 +135,36 @@ impl SocketHandler {
     }
 
     fn send_game_state(&self, game_state: &GameState) -> io::Result<()> {
+        self.socket.set_nonblocking(false)?;
         self.socket.send_to(&[UdpPacketTypes::GameState as u8], self.rlviser_addr)?;
         self.socket.send_to(&game_state.to_bytes(), self.rlviser_addr)?;
+        self.socket.set_nonblocking(true)?;
 
         Ok(())
     }
 
     fn report_game_speed(&self, speed: f32) -> io::Result<()> {
+        self.socket.set_nonblocking(false)?;
         self.socket.send_to(&[UdpPacketTypes::Speed as u8], self.rlviser_addr)?;
         self.socket.send_to(&speed.to_le_bytes(), self.rlviser_addr)?;
+        self.socket.set_nonblocking(true)?;
 
         Ok(())
     }
 
     fn report_game_paused(&self, paused: bool) -> io::Result<()> {
+        self.socket.set_nonblocking(false)?;
         self.socket.send_to(&[UdpPacketTypes::Paused as u8], self.rlviser_addr)?;
         self.socket.send_to(&[paused as u8], self.rlviser_addr)?;
+        self.socket.set_nonblocking(true)?;
 
         Ok(())
     }
 
     fn send_quit(&self) -> io::Result<()> {
+        self.socket.set_nonblocking(false)?;
         self.socket.send_to(&[UdpPacketTypes::Quit as u8], self.rlviser_addr)?;
+        self.socket.set_nonblocking(true)?;
 
         Ok(())
     }

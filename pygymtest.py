@@ -34,7 +34,7 @@ if __name__ == "__main__":
         reward_fn=CombinedReward((GoalReward(), 10.0), (TouchReward(), 0.1)),
         termination_cond=GoalCondition(),
         truncation_cond=AnyCondition(
-            TimeoutCondition(timeout=300.0), NoTouchTimeoutCondition(timeout=30.0)
+            TimeoutCondition(300.0), NoTouchTimeoutCondition(30.0)
         ),
         transition_engine=RocketSimEngine(),
         renderer=RLViserRenderer(),

@@ -294,7 +294,6 @@ impl<'a> ByteReader<'a> {
         Self { idx: 0, bytes }
     }
 
-    #[track_caller]
     pub fn read<I: FromBytesExact>(&mut self) -> I {
         let item = I::from_bytes(&self.bytes[self.idx..self.idx + I::NUM_BYTES]);
         self.idx += I::NUM_BYTES;
@@ -687,6 +686,7 @@ impl FromBytes for GameState {
 impl GameState {
     pub const MIN_NUM_BYTES: usize = u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES * 2;
 
+    #[inline]
     fn count_bytes(&self) -> usize {
         Self::MIN_NUM_BYTES
             + BallState::NUM_BYTES
@@ -695,6 +695,7 @@ impl GameState {
     }
 
     #[inline]
+    #[must_use]
     pub fn get_num_bytes(bytes: &[u8]) -> usize {
         Self::MIN_NUM_BYTES
             + BallState::NUM_BYTES
@@ -703,27 +704,32 @@ impl GameState {
     }
 
     #[inline]
+    #[must_use]
     pub fn read_tick_count(bytes: &[u8]) -> u64 {
         u64::from_bytes(&bytes[..u64::NUM_BYTES])
     }
 
     #[inline]
+    #[must_use]
     pub fn read_tick_rate(bytes: &[u8]) -> f32 {
         f32::from_bytes(&bytes[u64::NUM_BYTES..u64::NUM_BYTES + f32::NUM_BYTES])
     }
 
     #[inline]
+    #[must_use]
     pub fn read_game_mode(bytes: &[u8]) -> GameMode {
         GameMode::from_bytes(&bytes[(u64::NUM_BYTES + f32::NUM_BYTES)..=(u64::NUM_BYTES + f32::NUM_BYTES)])
     }
 
     #[inline]
+    #[must_use]
     pub fn read_num_pads(bytes: &[u8]) -> usize {
         u32::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES + 1..u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES])
             as usize
     }
 
     #[inline]
+    #[must_use]
     pub fn read_num_cars(bytes: &[u8]) -> usize {
         u32::from_bytes(&bytes[u64::NUM_BYTES + f32::NUM_BYTES + 1 + u32::NUM_BYTES..Self::MIN_NUM_BYTES]) as usize
     }
