@@ -3,6 +3,7 @@ import time
 import rlviser_py as vis
 import RocketSim as rs
 
+
 def run(arena, game_mode):
     # Setup example arena
     car = arena.add_car(rs.Team.BLUE)
@@ -32,6 +33,7 @@ def run(arena, game_mode):
         time.sleep(max(0, start_time + steps / arena.tick_rate - time.time()))
         steps += 1
 
+
 if __name__ == "__main__":
     game_mode = rs.GameMode.HOOPS
 
@@ -39,7 +41,9 @@ if __name__ == "__main__":
     arena = rs.Arena(game_mode)
 
     # Set boost pad locations
-    vis.set_boost_pad_locations([pad.get_pos().as_tuple() for pad in arena.get_boost_pads()])
+    vis.set_boost_pad_locations(
+        [pad.get_pos().as_tuple() for pad in arena.get_boost_pads()]
+    )
     run(arena, game_mode)
 
     # Tell RLViser to exit

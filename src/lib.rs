@@ -171,6 +171,7 @@ fn render(tick_count: u64, tick_rate: f32, game_mode: u8, boost_pad_states: Vec<
             })
             .collect(),
     };
+
     socket::send_game_state(&game_state).unwrap();
 }
 

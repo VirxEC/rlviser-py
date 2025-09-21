@@ -1,19 +1,21 @@
-from typing import Any
+from typing import Any, override
 
-import rlviser_py as rlviser
 import RocketSim as rsim
-from rlgym.api import Renderer
+from rlgym.api import AgentID, Renderer
 from rlgym.rocket_league.api import Car, GameState
 from rlgym.rocket_league.common_values import BOOST_LOCATIONS
 
+import rlviser_py as rlviser
 
-class RLViserRenderer(Renderer[GameState]):
-    def __init__(self, tick_rate=120 / 8):
+
+class RLViserRenderer(Renderer[GameState[AgentID]]):
+    def __init__(self, tick_rate: float = 120 / 8):
         rlviser.set_boost_pad_locations(BOOST_LOCATIONS)
-        self.tick_rate = tick_rate
-        self.packet_id = 0
+        self.tick_rate: float = tick_rate
+        self.packet_id: int = 0
 
-    def render(self, state: GameState, shared_info: dict[str, Any]) -> Any:
+    @override
+    def render(self, state: GameState[AgentID], shared_info: dict[str, Any]) -> Any:
         boost_pad_states = [bool(timer == 0) for timer in state.boost_pad_timers]
 
         ball = rsim.BallState()
@@ -39,11 +41,12 @@ class RLViserRenderer(Renderer[GameState]):
             cars=car_data,
         )
 
+    @override
     def close(self):
         rlviser.quit()
 
     # I stole this from RocketSimEngine
-    def _get_car_state(self, car: Car):
+    def _get_car_state(self, car: Car[AgentID]):
         car_state = rsim.CarState()
         car_state.pos = rsim.Vec(*car.physics.position)
         car_state.vel = rsim.Vec(*car.physics.linear_velocity)

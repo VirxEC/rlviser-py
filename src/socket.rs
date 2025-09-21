@@ -5,6 +5,7 @@ use std::{
     process::Command,
     sync::OnceLock,
 };
+use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
 const RLVISER_PORT: u16 = 45243;
 const ROCKETSIM_PORT: u16 = 34254;
@@ -60,9 +61,12 @@ struct SocketHandler {
 
 impl SocketHandler {
     pub fn new() -> io::Result<Self> {
-        // launch RLViser
-        if let Err(e) = Command::new(RLVISER_PATH).spawn() {
-            println!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
+        let sys = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing()));
+        let rlviser_procs = sys.processes_by_exact_name("rlviser".as_ref()).count();
+
+        // launch RLViser if it hasn't been already
+        if rlviser_procs == 0 && let Err(e) = Command::new(RLVISER_PATH).spawn() {
+            eprintln!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
         }
 
         let socket = UdpSocket::bind((Ipv4Addr::new(0, 0, 0, 0), ROCKETSIM_PORT))?;
@@ -85,7 +89,7 @@ impl SocketHandler {
 
         while self.socket.recv_from(&mut byte_buffer).is_ok() {
             let Some(packet_type) = UdpPacketTypes::new(byte_buffer[0]) else {
-                println!("Received unknown packet type: {}", byte_buffer[0]);
+                eprintln!("Received unknown packet type: {}", byte_buffer[0]);
                 break;
             };
 
@@ -201,7 +205,7 @@ pub fn report_game_paused(paused: bool) -> io::Result<()> {
 
 pub fn launch() -> io::Result<()> {
     if let Err(e) = Command::new(RLVISER_PATH).spawn() {
-        println!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
+        eprintln!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
     }
 
     Ok(())

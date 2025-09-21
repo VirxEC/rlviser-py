@@ -1,20 +1,20 @@
-from typing import Sequence, Optional
+from typing import Sequence
 
 from RocketSim import BallState, CarState, GameMode, CarConfig
 
-type TVec3 = tuple[float, float, float]
+TVec3 = tuple[float, float, float]
 """
 The items are (X, Y, Z) respectively
 """
-type TRotmat = tuple[TVec3, TVec3, TVec3]
+TRotmat = tuple[TVec3, TVec3, TVec3]
 """
 The items are (forward, right, up) respectively
 """
-type TBall = tuple[TVec3, TRotmat, TVec3, TVec3]
+TBall = tuple[TVec3, TRotmat, TVec3, TVec3]
 """
 The items are (location, rotation, velocity, angular velocity) respectively
 """
-type TCar = tuple[int, TVec3, TRotmat, TVec3, TVec3, float, bool, bool, bool, float]
+TCar = tuple[int, TVec3, TRotmat, TVec3, TVec3, float, bool, bool, bool, float]
 """
 The items are (car_id, location, rotation, velocity, angular velocity, boost, has jumped, has double jumped, has flipped, demo respawn timer) respectively
 """
@@ -22,7 +22,7 @@ The items are (car_id, location, rotation, velocity, angular velocity, boost, ha
 def set_boost_pad_locations(locations: Sequence[TVec3]) -> ...:
     pass
 
-def get_state_set() -> Optional[tuple[Sequence[float], TBall, Sequence[TCar]]]:
+def get_state_set() -> tuple[Sequence[float], TBall, Sequence[TCar]] | None:
     """
     Sequence[float] - Boost pad states, 0 for full and some positive value for the time in seconds until it respawns
     TBall - Ball state
@@ -61,7 +61,7 @@ def report_game_paused(paused: bool) -> ...:
     """
     pass
 
-type CarData = tuple[int, int, CarConfig, CarState]
+CarData = tuple[int, int, CarConfig, CarState]
 """
 The items are (car_id, team, car_config, car_state) respectively
 """
@@ -69,7 +69,7 @@ The items are (car_id, team, car_config, car_state) respectively
 def render(tick_count: int, tick_rate: float, game_mode: GameMode, boost_pad_states: Sequence[bool], ball: BallState, cars: Sequence[CarData]) -> ...:
     pass
 
-def launch():
+def launch() -> ...:
     """
     Opens RLViser. Useful if `quit()` was called and you want to open it again.
     """

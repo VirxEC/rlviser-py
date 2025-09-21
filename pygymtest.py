@@ -51,9 +51,7 @@ if __name__ == "__main__":
             for agent_id, (type, action_spaces) in env.action_spaces.items():
                 actions[agent_id] = np.random.randint(action_spaces, size=(1,))
 
-            obs_dict, reward_dict, terminated_dict, truncated_dict = env.step(
-                actions
-            )
+            obs_dict, reward_dict, terminated_dict, truncated_dict = env.step(actions)
             env.render()
             time.sleep(15 / 120 / game_speed)
             steps += 1

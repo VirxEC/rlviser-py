@@ -71,6 +71,9 @@ docs/_build/
 # Pyenv
 .python-version
 
+# uv
+uv.lock
+
 # RocketSim
 collision_meshes/
 
