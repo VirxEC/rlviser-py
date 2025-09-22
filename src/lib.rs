@@ -146,7 +146,12 @@ fn render(tick_count: u64, tick_rate: f32, game_mode: u8, boost_pad_states: Vec<
     let game_state = GameState {
         tick_count,
         tick_rate,
-        game_mode: GameMode::from_bytes(&[game_mode]),
+        game_mode: if game_mode == 4 {
+            // python binds don't support dropshot yet
+            GameMode::TheVoid
+        } else {
+            GameMode::from_bytes(&[game_mode])
+        },
         ball,
         pads: BOOST_PAD_LOCATIONS.with_borrow(|locs| {
             locs.iter()

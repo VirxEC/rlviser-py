@@ -168,7 +168,7 @@ dependencies = [
 
 [[package]]
 name = "rlviser-py"
-version = "0.6.11"
+version = "0.6.12"
 dependencies = [
  "pyo3",
  "sysinfo",

@@ -65,7 +65,9 @@ impl SocketHandler {
         let rlviser_procs = sys.processes_by_exact_name("rlviser".as_ref()).count();
 
         // launch RLViser if it hasn't been already
-        if rlviser_procs == 0 && let Err(e) = Command::new(RLVISER_PATH).spawn() {
+        if rlviser_procs == 0
+            && let Err(e) = Command::new(RLVISER_PATH).spawn()
+        {
             eprintln!("Failed to launch RLViser ({RLVISER_PATH}): {e}");
         }
 

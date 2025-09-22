@@ -2,12 +2,13 @@ use core::fmt;
 use pyo3::FromPyObject;
 
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum GameMode {
     Soccar,
     Hoops,
     HeatSeeker,
     Snowday,
+    Dropshot,
     #[default]
     TheVoid,
 }
@@ -107,6 +108,16 @@ pub struct BallState {
     pub heatseeker_target_dir: f32,
     pub heatseeker_target_speed: f32,
     pub heatseeker_time_since_hit: f32,
+    #[pyo3(default)]
+    pub dropshot_charge_level: i32,
+    #[pyo3(default)]
+    pub dropshot_accumulated_hit_force: f32,
+    #[pyo3(default)]
+    pub dropshot_target_dir: f32,
+    #[pyo3(default)]
+    pub dropshot_has_damaged: bool,
+    #[pyo3(default)]
+    pub dropshot_last_damage_tick: u64,
 }
 
 pub type TBall = (TVec3, TRotMat, TVec3, TVec3);
@@ -123,6 +134,11 @@ impl Default for BallState {
             heatseeker_target_dir: 0.,
             heatseeker_target_speed: 2900.,
             heatseeker_time_since_hit: 0.,
+            dropshot_charge_level: 0,
+            dropshot_accumulated_hit_force: 0.0,
+            dropshot_target_dir: 0.0,
+            dropshot_has_damaged: false,
+            dropshot_last_damage_tick: 0,
         }
     }
 }
@@ -171,6 +187,8 @@ pub struct CarConfig {
     pub hitbox_pos_offset: Vec3,
     pub front_wheels: WheelPairConfig,
     pub back_wheels: WheelPairConfig,
+    #[pyo3(default)]
+    pub three_wheels: bool,
     pub dodge_deadzone: f32,
 }
 
@@ -207,6 +225,10 @@ pub struct CarState {
     pub air_time_since_jump: f32,
     pub boost: f32,
     pub time_spent_boosting: f32,
+    #[pyo3(default)]
+    pub is_boosting: bool,
+    #[pyo3(default)]
+    pub boosting_time: f32,
     pub is_supersonic: bool,
     pub supersonic_time: f32,
     pub handbrake_val: f32,
@@ -425,7 +447,8 @@ impl FromBytes for GameMode {
             1 => Self::Hoops,
             2 => Self::HeatSeeker,
             3 => Self::Snowday,
-            4 => Self::TheVoid,
+            4 => Self::Dropshot,
+            5 => Self::TheVoid,
             _ => unreachable!(),
         }
     }
@@ -546,7 +569,14 @@ macro_rules! impl_bytes_exact {
 impl_bytes_exact!(RotMat, Vec3::NUM_BYTES * 3, forward, right, up);
 impl_bytes_exact!(
     BallState,
-    u64::NUM_BYTES + Vec3::NUM_BYTES * 3 + RotMat::NUM_BYTES + f32::NUM_BYTES * 3,
+    u64::NUM_BYTES
+        + Vec3::NUM_BYTES * 3
+        + RotMat::NUM_BYTES
+        + f32::NUM_BYTES * 3
+        + i32::NUM_BYTES
+        + f32::NUM_BYTES * 2
+        + 1
+        + u64::NUM_BYTES,
     update_counter,
     pos,
     rot_mat,
@@ -554,7 +584,12 @@ impl_bytes_exact!(
     ang_vel,
     heatseeker_target_dir,
     heatseeker_target_speed,
-    heatseeker_time_since_hit
+    heatseeker_time_since_hit,
+    dropshot_charge_level,
+    dropshot_accumulated_hit_force,
+    dropshot_target_dir,
+    dropshot_has_damaged,
+    dropshot_last_damage_tick
 );
 impl_bytes_exact!(
     BoostPadState,
@@ -598,8 +633,8 @@ impl_bytes_exact!(
     u64::NUM_BYTES
         + Vec3::NUM_BYTES * 5
         + RotMat::NUM_BYTES
-        + 14
-        + f32::NUM_BYTES * 12
+        + 15
+        + f32::NUM_BYTES * 13
         + u32::NUM_BYTES
         + BallHitInfo::NUM_BYTES
         + CarControls::NUM_BYTES,
@@ -622,6 +657,8 @@ impl_bytes_exact!(
     air_time_since_jump,
     boost,
     time_spent_boosting,
+    is_boosting,
+    boosting_time,
     is_supersonic,
     supersonic_time,
     handbrake_val,
@@ -646,11 +683,12 @@ impl_bytes_exact!(
 );
 impl_bytes_exact!(
     CarConfig,
-    Vec3::NUM_BYTES * 2 + WheelPairConfig::NUM_BYTES * 2 + f32::NUM_BYTES,
+    Vec3::NUM_BYTES * 2 + WheelPairConfig::NUM_BYTES * 2 + f32::NUM_BYTES + 1,
     hitbox_size,
     hitbox_pos_offset,
     front_wheels,
     back_wheels,
+    three_wheels,
     dodge_deadzone
 );
 impl_bytes_exact!(
@@ -688,6 +726,11 @@ impl GameState {
 
     #[inline]
     fn count_bytes(&self) -> usize {
+        assert_ne!(
+            self.game_mode,
+            GameMode::Dropshot,
+            "Python binds shouldn't support dropshot yet!"
+        );
         Self::MIN_NUM_BYTES
             + BallState::NUM_BYTES
             + self.pads.len() * BoostPad::NUM_BYTES
