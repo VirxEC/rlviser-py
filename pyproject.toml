@@ -4,13 +4,17 @@ build-backend = "maturin"
 
 [project]
 name = "rlviser-py"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version", "description", "urls", "readme"]
+dependencies = [
+    "numpy>=2.0.0",
+    "rocketsim>=2.2.1",
+]
 
 [tool.maturin]
 features = ["pyo3/extension-module", "pyo3/abi3-py37"]

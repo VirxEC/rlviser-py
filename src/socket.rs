@@ -1,4 +1,4 @@
-use crate::bytes::{FromBytes, GameState, ToBytes};
+use crate::bytes::{FromFlat, GameState, ToFlat};
 use std::{
     io,
     net::{Ipv4Addr, SocketAddr, UdpSocket},
@@ -7,35 +7,17 @@ use std::{
 };
 use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 
+use crate::flat::rocketsim as fb;
+
 const RLVISER_PORT: u16 = 45243;
 const ROCKETSIM_PORT: u16 = 34254;
+const PACKET_SIZE_BYTES: usize = 8;
 
-#[repr(u8)]
-#[derive(Debug)]
-pub enum UdpPacketTypes {
-    Quit,
-    GameState,
-    Connection,
-    Paused,
-    Speed,
-    Render,
-}
-
-impl UdpPacketTypes {
-    const fn new(byte: u8) -> Option<Self> {
-        match byte {
-            0 => Some(Self::Quit),
-            1 => Some(Self::GameState),
-            2 => Some(Self::Connection),
-            3 => Some(Self::Paused),
-            4 => Some(Self::Speed),
-            5 => Some(Self::Render),
-            _ => None,
-        }
-    }
-}
-
-const RLVISER_PATH: &str = if cfg!(windows) { "./rlviser.exe" } else { "./rlviser" };
+const RLVISER_PATH: &str = if cfg!(windows) {
+    "./rlviser.exe"
+} else {
+    "./rlviser"
+};
 
 static SOCKET: OnceLock<SocketHandler> = OnceLock::new();
 
@@ -59,9 +41,33 @@ struct SocketHandler {
     rlviser_addr: SocketAddr,
 }
 
+/// Encode a flatbuffer Message into the wire format:
+///   [8-byte big-endian payload length][flatbuffer Packet payload]
+fn encode_message(message: fb::Message) -> Vec<u8> {
+    let mut builder = planus::Builder::with_capacity(1024);
+    let packet = fb::Packet { message };
+    let payload = builder.finish(packet, None);
+    let data_len_bin = u64::try_from(payload.len()).unwrap().to_be_bytes();
+
+    let mut buffer = Vec::with_capacity(PACKET_SIZE_BYTES + payload.len());
+    buffer.extend_from_slice(&data_len_bin);
+    buffer.extend_from_slice(payload);
+    buffer
+}
+
+/// Decode a flatbuffer Packet payload (after the 8-byte header) into a Message.
+fn decode_payload(payload: &[u8]) -> io::Result<fb::Message> {
+    let packet: fb::Packet = <fb::PacketRef<'_> as planus::ReadAsRoot>::read_as_root(payload)
+        .and_then(|p| p.try_into())
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
+    Ok(packet.message)
+}
+
 impl SocketHandler {
     pub fn new() -> io::Result<Self> {
-        let sys = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing()));
+        let sys = System::new_with_specifics(
+            RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing()),
+        );
         let rlviser_procs = sys.processes_by_exact_name("rlviser".as_ref()).count();
 
         // launch RLViser if it hasn't been already
@@ -74,62 +80,52 @@ impl SocketHandler {
         let socket = UdpSocket::bind((Ipv4Addr::new(0, 0, 0, 0), ROCKETSIM_PORT))?;
         let rlviser_addr = (Ipv4Addr::new(127, 0, 0, 1), RLVISER_PORT).into();
 
-        socket.send_to(&[UdpPacketTypes::Connection as u8], rlviser_addr)?;
+        socket.send_to(
+            &encode_message(fb::Message::Connection(Box::default())),
+            rlviser_addr,
+        )?;
         socket.set_nonblocking(true)?;
 
-        Ok(Self { socket, rlviser_addr })
+        Ok(Self {
+            socket,
+            rlviser_addr,
+        })
     }
 
     fn handle_return_messages(&self) -> io::Result<ReturnMessage> {
-        let mut byte_buffer = [0];
-        let mut min_game_state_buf = [0; GameState::MIN_NUM_BYTES];
-        let mut game_state_buffer = Vec::new();
+        let mut header = [0u8; PACKET_SIZE_BYTES];
+        let mut buffer = Vec::with_capacity(1024);
 
         let mut game_state = None;
         let mut speed = None;
         let mut paused = None;
 
-        while self.socket.recv_from(&mut byte_buffer).is_ok() {
-            let Some(packet_type) = UdpPacketTypes::new(byte_buffer[0]) else {
-                eprintln!("Received unknown packet type: {}", byte_buffer[0]);
-                break;
+        while self.socket.peek_from(&mut header).is_ok() {
+            let packet_size = PACKET_SIZE_BYTES + u64::from_be_bytes(header) as usize;
+            buffer.resize(packet_size, 0);
+
+            let (_, _src) = self.socket.recv_from(&mut buffer)?;
+            let payload = &buffer[PACKET_SIZE_BYTES..];
+
+            let Ok(message) = decode_payload(payload) else {
+                continue;
             };
 
-            match packet_type {
-                UdpPacketTypes::GameState => {
-                    self.socket.set_nonblocking(false)?;
-
-                    let _ = self.socket.peek_from(&mut min_game_state_buf);
-
-                    let num_bytes = GameState::get_num_bytes(&min_game_state_buf);
-                    game_state_buffer.resize(num_bytes, 0);
-                    self.socket.recv_from(&mut game_state_buffer)?;
-
-                    self.socket.set_nonblocking(true)?;
-
-                    game_state = Some(GameState::from_bytes(&game_state_buffer));
+            match message {
+                fb::Message::Connection(_) => {
+                    eprintln!("Connection established");
                 }
-                UdpPacketTypes::Speed => {
-                    self.socket.set_nonblocking(false)?;
-
-                    let mut speed_buffer = [0; 4];
-                    self.socket.recv_from(&mut speed_buffer)?;
-
-                    self.socket.set_nonblocking(true)?;
-
-                    speed = Some(f32::from_bytes(&speed_buffer));
+                fb::Message::Speed(s) => {
+                    speed = Some(s.speed);
                 }
-                UdpPacketTypes::Paused => {
-                    self.socket.set_nonblocking(false)?;
-                    self.socket.recv_from(&mut byte_buffer)?;
-                    self.socket.set_nonblocking(true)?;
-
-                    paused = Some(byte_buffer[0] == 1);
+                fb::Message::Paused(p) => {
+                    paused = Some(p.paused);
                 }
-                UdpPacketTypes::Quit | UdpPacketTypes::Render => {
-                    panic!("We shouldn't be receiving packets of type {packet_type:?}")
+                fb::Message::GameState(gs) => {
+                    game_state = Some(GameState::from_flat(*gs));
                 }
-                UdpPacketTypes::Connection => {}
+                fb::Message::Quit(_) => {}
+                fb::Message::AddRender(_) | fb::Message::RemoveRender(_) => {}
             }
         }
 
@@ -141,37 +137,27 @@ impl SocketHandler {
     }
 
     fn send_game_state(&self, game_state: &GameState) -> io::Result<()> {
-        self.socket.set_nonblocking(false)?;
-        self.socket.send_to(&[UdpPacketTypes::GameState as u8], self.rlviser_addr)?;
-        self.socket.send_to(&game_state.to_bytes(), self.rlviser_addr)?;
-        self.socket.set_nonblocking(true)?;
-
+        let fb_gs = game_state.to_flat();
+        let bytes = encode_message(fb::Message::GameState(Box::new(fb_gs)));
+        self.socket.send_to(&bytes, self.rlviser_addr)?;
         Ok(())
     }
 
     fn report_game_speed(&self, speed: f32) -> io::Result<()> {
-        self.socket.set_nonblocking(false)?;
-        self.socket.send_to(&[UdpPacketTypes::Speed as u8], self.rlviser_addr)?;
-        self.socket.send_to(&speed.to_le_bytes(), self.rlviser_addr)?;
-        self.socket.set_nonblocking(true)?;
-
+        let bytes = encode_message(fb::Message::Speed(Box::new(fb::Speed { speed })));
+        self.socket.send_to(&bytes, self.rlviser_addr)?;
         Ok(())
     }
 
     fn report_game_paused(&self, paused: bool) -> io::Result<()> {
-        self.socket.set_nonblocking(false)?;
-        self.socket.send_to(&[UdpPacketTypes::Paused as u8], self.rlviser_addr)?;
-        self.socket.send_to(&[paused as u8], self.rlviser_addr)?;
-        self.socket.set_nonblocking(true)?;
-
+        let bytes = encode_message(fb::Message::Paused(Box::new(fb::Paused { paused })));
+        self.socket.send_to(&bytes, self.rlviser_addr)?;
         Ok(())
     }
 
     fn send_quit(&self) -> io::Result<()> {
-        self.socket.set_nonblocking(false)?;
-        self.socket.send_to(&[UdpPacketTypes::Quit as u8], self.rlviser_addr)?;
-        self.socket.set_nonblocking(true)?;
-
+        let bytes = encode_message(fb::Message::Quit(Box::default()));
+        self.socket.send_to(&bytes, self.rlviser_addr)?;
         Ok(())
     }
 }
@@ -181,28 +167,24 @@ pub fn get_return_messages() -> ReturnMessage {
         return ReturnMessage::NONE;
     };
 
-    socket_handler.handle_return_messages().unwrap_or(ReturnMessage::NONE)
+    socket_handler
+        .handle_return_messages()
+        .unwrap_or(ReturnMessage::NONE)
 }
 
 pub fn send_game_state(game_state: &GameState) -> io::Result<()> {
     let socket_handler = SOCKET.get_or_init(|| SocketHandler::new().unwrap());
-    socket_handler.send_game_state(game_state)?;
-
-    Ok(())
+    socket_handler.send_game_state(game_state)
 }
 
 pub fn report_game_speed(speed: f32) -> io::Result<()> {
     let socket_handler = SOCKET.get_or_init(|| SocketHandler::new().unwrap());
-    socket_handler.report_game_speed(speed)?;
-
-    Ok(())
+    socket_handler.report_game_speed(speed)
 }
 
 pub fn report_game_paused(paused: bool) -> io::Result<()> {
     let socket_handler = SOCKET.get_or_init(|| SocketHandler::new().unwrap());
-    socket_handler.report_game_paused(paused)?;
-
-    Ok(())
+    socket_handler.report_game_paused(paused)
 }
 
 pub fn launch() -> io::Result<()> {

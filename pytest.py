@@ -12,7 +12,7 @@ def run(arena, game_mode):
     car.set_controls(rs.CarControls(throttle=1, steer=1, boost=True))
 
     # Run for 3 seconds
-    TIME = 3
+    TIME = 10
 
     steps = 0
     start_time = time.time()
