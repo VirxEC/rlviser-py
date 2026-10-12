@@ -12,6 +12,7 @@ use crate::flat::rocketsim as fb;
 const RLVISER_PORT: u16 = 45243;
 const ROCKETSIM_PORT: u16 = 34254;
 const PACKET_SIZE_BYTES: usize = 8;
+const MAX_DATAGRAM_SIZE: usize = 65536;
 
 const RLVISER_PATH: &str = if cfg!(windows) {
     "./rlviser.exe"
@@ -93,19 +94,36 @@ impl SocketHandler {
     }
 
     fn handle_return_messages(&self) -> io::Result<ReturnMessage> {
-        let mut header = [0u8; PACKET_SIZE_BYTES];
-        let mut buffer = Vec::with_capacity(1024);
+        // Read whole datagrams instead of peeking at the header first. On Windows, peeking into a buffer
+        // smaller than the datagram fails with WSAEMSGSIZE, and a peek never clears a pending
+        // WSAECONNRESET, so either error would stop all messages from RLViser being read.
+        let mut buffer = vec![0u8; MAX_DATAGRAM_SIZE];
 
         let mut game_state = None;
         let mut speed = None;
         let mut paused = None;
 
-        while self.socket.peek_from(&mut header).is_ok() {
-            let packet_size = PACKET_SIZE_BYTES + u64::from_be_bytes(header) as usize;
-            buffer.resize(packet_size, 0);
+        loop {
+            let len = match self.socket.recv_from(&mut buffer) {
+                Ok((len, _src)) => len,
+                // On Windows, each packet sent while RLViser wasn't listening yet (e.g. while it starts up)
+                // makes one later receive fail with WSAECONNRESET. Each receive clears one; keep reading.
+                Err(e) if e.kind() == io::ErrorKind::ConnectionReset => continue,
+                Err(_) => break,
+            };
 
-            let (_, _src) = self.socket.recv_from(&mut buffer)?;
-            let payload = &buffer[PACKET_SIZE_BYTES..];
+            if len < PACKET_SIZE_BYTES {
+                continue;
+            }
+            let header: [u8; PACKET_SIZE_BYTES] = buffer[..PACKET_SIZE_BYTES].try_into().unwrap();
+            let Some(end) = usize::try_from(u64::from_be_bytes(header))
+                .ok()
+                .and_then(|payload_len| PACKET_SIZE_BYTES.checked_add(payload_len))
+                .filter(|&end| end <= len)
+            else {
+                continue;
+            };
+            let payload = &buffer[PACKET_SIZE_BYTES..end];
 
             let Ok(message) = decode_payload(payload) else {
                 continue;
